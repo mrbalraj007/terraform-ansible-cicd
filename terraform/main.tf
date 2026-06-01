@@ -13,10 +13,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "terraform-ansible-cicd"     # replace your region here
-    key            = "terraform-ansible/terraform.tfstate"
-    region         = "us-east-1"
-  
+    bucket = "terraform-ansible-cicd" # replace your region here
+    key    = "terraform-ansible/terraform.tfstate"
+    region = "us-east-1"
+
   }
 }
 
