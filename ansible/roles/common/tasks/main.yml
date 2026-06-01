@@ -4,19 +4,18 @@
 
 ---
 - name: Update all packages
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     name: "*"
     state: latest
     update_cache: true
 
 - name: Install common utilities
-  ansible.builtin.yum:
+  ansible.builtin.dnf:
     name:
       - curl
       - wget
       - unzip
       - git
-      - python3
     state: present
 
 - name: Set timezone to UTC

@@ -24,12 +24,12 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "aws_ami" "amazon_linux_2" {
+data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
   filter {
     name   = "name"
-    values = ["amzn2-ami-hvm-*-x86_64-gp2"]
+    values = ["al2023-ami-*-kernel-6.1-x86_64"]
   }
   filter {
     name   = "virtualization-type"
@@ -88,7 +88,7 @@ resource "aws_key_pair" "deployer" {
 # ── Web instances — tagged Role=web for Ansible grouping ──
 resource "aws_instance" "web" {
   count                       = var.web_instance_count
-  ami                         = data.aws_ami.amazon_linux_2.id
+  ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.deployer.key_name
   subnet_id                   = data.aws_subnets.default.ids[count.index % length(data.aws_subnets.default.ids)]
@@ -114,7 +114,7 @@ resource "aws_instance" "web" {
 # ── App instances — tagged Role=app for Ansible grouping ──
 resource "aws_instance" "app" {
   count                       = var.app_instance_count
-  ami                         = data.aws_ami.amazon_linux_2.id
+  ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.deployer.key_name
   subnet_id                   = data.aws_subnets.default.ids[count.index % length(data.aws_subnets.default.ids)]
