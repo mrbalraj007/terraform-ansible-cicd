@@ -1,6 +1,13 @@
 name: "1 - Terraform Provision Infrastructure"
 
 on:
+  workflow_call:
+    secrets:
+      AWS_IAM_ROLE_ARN:
+        required: true
+      SSH_PUBLIC_KEY:
+        required: true
+
   push:
     branches: [main]
     paths:

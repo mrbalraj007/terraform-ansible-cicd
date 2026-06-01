@@ -1,6 +1,13 @@
 name: "2 - Ansible Configure Instances"
 
 on:
+  workflow_call:
+    secrets:
+      AWS_IAM_ROLE_ARN:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: true
+
   # Triggered automatically after Terraform Apply succeeds
   workflow_run:
     workflows: ["1 - Terraform Provision Infrastructure"]
