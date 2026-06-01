@@ -47,6 +47,7 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Install Ansible and AWS dependencies
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
           python3 -m pip install --upgrade pip
           pip install ansible boto3 botocore
