@@ -12,11 +12,12 @@
 - name: Install common utilities
   ansible.builtin.dnf:
     name:
-      - curl
       - wget
       - unzip
       - git
     state: present
+  # NOTE: curl is intentionally excluded — Amazon Linux 2023 ships
+  # curl-minimal, which conflicts with the full curl package.
 
 - name: Set timezone to UTC
   community.general.timezone:
