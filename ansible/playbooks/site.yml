@@ -1,4 +1,11 @@
 ---
+- name: Configure All Instances
+  hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - common
+
 - name: Configure Web Servers
   hosts: tag_Role_web
   become: true
