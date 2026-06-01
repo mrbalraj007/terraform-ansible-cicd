@@ -1,0 +1,97 @@
+name: "2 - Ansible Configure Instances"
+
+on:
+  # Triggered automatically after Terraform Apply succeeds
+  workflow_run:
+    workflows: ["1 - Terraform Provision Infrastructure"]
+    types: [completed]
+    branches: [main]
+
+  # Also allow manual trigger
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Ansible --limit (e.g. tag_Role_web, tag_Role_app, all)"
+        required: false
+        default: "all"
+      tags:
+        description: "Ansible --tags to run specific tasks"
+        required: false
+        default: ""
+
+env:
+  AWS_REGION: "ap-southeast-2"
+  ANSIBLE_WORKING_DIR: "./ansible"
+
+jobs:
+  ansible-configure:
+    name: "Run Ansible Playbook"
+    runs-on: ubuntu-latest
+    # Only run if Terraform workflow succeeded (when triggered by workflow_run)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Ansible and AWS dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install ansible boto3 botocore
+          ansible-galaxy collection install amazon.aws ansible.posix community.general
+
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deployer_key
+          chmod 600 ~/.ssh/deployer_key
+
+      - name: Wait for EC2 instances to be ready
+        run: |
+          echo "Waiting 30s for instances to initialize..."
+          sleep 30
+
+      - name: Test dynamic inventory
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          ansible-inventory -i aws_ec2.yml --list | python3 -m json.tool
+          echo "───────────────────────────────────"
+          ansible-inventory -i aws_ec2.yml --graph
+
+      - name: Test SSH connectivity to all hosts
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          ansible all -i aws_ec2.yml -m ping \
+            --private-key ~/.ssh/deployer_key \
+            -u ec2-user
+
+      - name: Run Ansible playbook
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          LIMIT="${{ github.event.inputs.limit || 'all' }}"
+          TAGS="${{ github.event.inputs.tags }}"
+
+          CMD="ansible-playbook -i aws_ec2.yml playbooks/site.yml"
+          CMD="$CMD --private-key ~/.ssh/deployer_key"
+          CMD="$CMD --limit $LIMIT"
+          [ -n "$TAGS" ] && CMD="$CMD --tags $TAGS"
+          CMD="$CMD -v"
+
+          echo "Running: $CMD"
+          eval $CMD
+
+      - name: Verify web server is responding
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          ansible tag_Role_web -i aws_ec2.yml \
+            --private-key ~/.ssh/deployer_key \
+            -u ec2-user \
+            -m uri -a "url=http://{{ ansible_host }} return_content=yes"

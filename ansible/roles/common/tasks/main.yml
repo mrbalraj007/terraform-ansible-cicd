@@ -1,0 +1,30 @@
+# ============================================================
+# roles/common/tasks/main.yml
+# ============================================================
+
+---
+- name: Update all packages
+  ansible.builtin.yum:
+    name: "*"
+    state: latest
+    update_cache: true
+
+- name: Install common utilities
+  ansible.builtin.yum:
+    name:
+      - curl
+      - wget
+      - unzip
+      - git
+      - python3
+    state: present
+
+- name: Set timezone to UTC
+  community.general.timezone:
+    name: UTC
+
+- name: Ensure /etc/motd shows instance info
+  ansible.builtin.template:
+    src: motd.j2
+    dest: /etc/motd
+    mode: "0644"

@@ -1,0 +1,14 @@
+---
+- name: Configure Web Servers
+  hosts: tag_Role_web
+  become: true
+  gather_facts: true
+  roles:
+    - webserver
+
+- name: Configure App Servers
+  hosts: tag_Role_app
+  become: true
+  gather_facts: true
+  roles:
+    - appserver

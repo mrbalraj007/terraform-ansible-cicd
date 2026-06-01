@@ -1,0 +1,35 @@
+# ============================================================
+# ansible/site.yml — Main playbook
+# Targets all instances in the "role_web" dynamic group
+# ============================================================
+
+---
+- name: Configure Web Servers
+  hosts: role_web          # Populated by aws_ec2 dynamic inventory
+  become: true
+  gather_facts: true
+
+  vars:
+    app_port: 80
+    app_name: "Hello from Terraform + Ansible CI/CD"
+
+  pre_tasks:
+    - name: Wait for SSH to become available
+      ansible.builtin.wait_for_connection:
+        timeout: 120
+        delay: 10
+
+    - name: Gather facts after connection established
+      ansible.builtin.setup:
+
+  roles:
+    - common
+    - webserver
+
+  post_tasks:
+    - name: Verify HTTP service is responding
+      ansible.builtin.uri:
+        url: "http://{{ ansible_host }}"
+        status_code: 200
+      delegate_to: localhost
+      become: false

@@ -1,0 +1,23 @@
+name: "3 - Full CI/CD Pipeline (Provision + Configure)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "dev"
+        type: choice
+        options: [dev, staging, prod]
+
+jobs:
+  provision:
+    name: "Terraform Provision"
+    uses: ./.github/workflows/01-terraform-provision.yml
+    secrets: inherit
+
+  configure:
+    name: "Ansible Configure"
+    needs: provision
+    uses: ./.github/workflows/02-ansible-configure.yml
+    secrets: inherit

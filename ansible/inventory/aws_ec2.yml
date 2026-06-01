@@ -1,0 +1,36 @@
+# ============================================================
+# ansible/inventory/aws_ec2.yml
+# Dynamic Inventory — aws_ec2 plugin
+# Discovers instances by Tag: Role=web, Project=tf-ansible-demo
+# ============================================================
+
+plugin: amazon.aws.aws_ec2
+
+regions:
+  - ap-southeast-2          # ← must match your Terraform region
+
+# ── Filter to only YOUR project instances ───────────────────
+filters:
+  tag:Project: tf-ansible-demo
+  tag:Role: web
+  instance-state-name: running
+
+# ── Group instances by tag values ───────────────────────────
+keyed_groups:
+  - key: tags.Env
+    prefix: env
+    separator: "_"
+  - key: tags.Role
+    prefix: role
+    separator: "_"
+  - key: placement.region
+    prefix: region
+    separator: "_"
+
+# ── Use public IP for SSH ────────────────────────────────────
+hostnames:
+  - public_ip_address
+
+# ── Variables attached to every discovered host ──────────────
+compose:
+  ansible_host: public_ip_address

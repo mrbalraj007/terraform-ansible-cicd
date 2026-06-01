@@ -1,0 +1,44 @@
+# ──────────────────────────────────────────────────────────────
+# Ansible AWS EC2 Dynamic Inventory Plugin
+# Docs: https://docs.ansible.com/ansible/latest/collections/amazon/aws/aws_ec2_inventory.html
+# ──────────────────────────────────────────────────────────────
+plugin: amazon.aws.aws_ec2
+
+# AWS credentials come from environment variables:
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+# (set as GitHub Secrets — no hardcoded creds here)
+
+regions:
+  - ap-southeast-2
+
+# Only include running instances
+filters:
+  instance-state-name: running
+  "tag:Project": tf-ansible-demo        # Match Terraform tag
+  "tag:ManagedBy": Terraform
+
+# ── How to connect to instances ──
+hostnames:
+  - public-ip-address                    # Use public IP as hostname
+
+# ── Build groups from EC2 tags ──
+keyed_groups:
+  # Creates groups: tag_Role_web, tag_Role_app
+  - key: tags.Role
+    prefix: tag_Role
+    separator: "_"
+
+  # Creates groups: tag_Environment_dev, tag_Environment_prod
+  - key: tags.Environment
+    prefix: tag_Environment
+    separator: "_"
+
+  # Creates groups based on instance type
+  - key: instance_type
+    prefix: instance_type
+
+# ── Variables available on every host ──
+compose:
+  ansible_host: public_ip_address
+  ansible_user: "ec2-user"              # Amazon Linux 2 default user
+  # ansible_ssh_private_key_file is set in ansible.cfg
