@@ -23,6 +23,10 @@ env:
   AWS_REGION: "us-east-1"
   ANSIBLE_WORKING_DIR: "./ansible"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   ansible-configure:
     name: "Run Ansible Playbook"
@@ -56,8 +60,8 @@ jobs:
 
       - name: Wait for EC2 instances to be ready
         run: |
-          echo "Waiting 30s for instances to initialize..."
-          sleep 30
+          echo "Waiting 3 minutes for EC2 instances to fully initialize..."
+          sleep 180
 
       - name: Test dynamic inventory
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
