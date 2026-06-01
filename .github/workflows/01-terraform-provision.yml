@@ -15,7 +15,7 @@ on:
         options: [plan, apply, destroy]
 
 env:
-  TF_VERSION: "1.7.5"
+  TF_VERSION: "1.15.3"
   AWS_REGION: "us-east-1"
   TF_WORKING_DIR: "./terraform"
 
@@ -42,6 +42,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -99,6 +100,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -150,6 +152,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
