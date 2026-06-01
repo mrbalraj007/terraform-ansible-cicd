@@ -26,7 +26,7 @@ on:
           - destroy
 
 env:
-  AWS_REGION:       ap-southeast-2
+  AWS_REGION:       us-east-1
   TF_VERSION:       1.7.5
   ANSIBLE_VERSION:  "9.5.1"
   WORKING_DIR_TF:   terraform

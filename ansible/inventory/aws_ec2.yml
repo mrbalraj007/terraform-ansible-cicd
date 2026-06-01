@@ -7,7 +7,7 @@
 plugin: amazon.aws.aws_ec2
 
 regions:
-  - ap-southeast-2          # ← must match your Terraform region
+  - us-east-1          # ← must match your Terraform region
 
 # ── Filter to only YOUR project instances ───────────────────
 filters:

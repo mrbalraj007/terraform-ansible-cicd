@@ -9,7 +9,7 @@ plugin: amazon.aws.aws_ec2
 # (set as GitHub Secrets — no hardcoded creds here)
 
 regions:
-  - ap-southeast-2
+  - us-east-1
 
 # Only include running instances
 filters:

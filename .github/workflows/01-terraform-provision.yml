@@ -16,7 +16,7 @@ on:
 
 env:
   TF_VERSION: "1.7.5"
-  AWS_REGION: "ap-southeast-2"
+  AWS_REGION: "us-east-1"
   TF_WORKING_DIR: "./terraform"
 
 permissions:

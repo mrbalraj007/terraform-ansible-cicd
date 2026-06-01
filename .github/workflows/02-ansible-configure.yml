@@ -20,7 +20,7 @@ on:
         default: ""
 
 env:
-  AWS_REGION: "ap-southeast-2"
+  AWS_REGION: "us-east-1"
   ANSIBLE_WORKING_DIR: "./ansible"
 
 jobs:

@@ -5,9 +5,9 @@
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
-GITHUB_ORG="your-github-org"        # <-- Replace
-GITHUB_REPO="your-repo-name"        # <-- Replace
-AWS_REGION="ap-southeast-2"
+GITHUB_ORG="mrbalraj007"
+GITHUB_REPO="terraform-ansible-cicd"
+AWS_REGION="us-east-1"
 ROLE_NAME="github-actions-terraform-role"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 
@@ -42,22 +42,31 @@ TRUST_POLICY=$(cat <<EOF
 EOF
 )
 
-echo "Creating IAM role..."
-aws iam create-role \
-  --role-name "$ROLE_NAME" \
-  --assume-role-policy-document "$TRUST_POLICY"
+if aws iam get-role --role-name "$ROLE_NAME" &>/dev/null; then
+  echo "IAM role '$ROLE_NAME' already exists — updating trust policy..."
+  aws iam update-assume-role-policy \
+    --role-name "$ROLE_NAME" \
+    --policy-document "$TRUST_POLICY"
+else
+  echo "Creating IAM role..."
+  aws iam create-role \
+    --role-name "$ROLE_NAME" \
+    --assume-role-policy-document "$TRUST_POLICY"
+fi
 
-aws iam attach-role-policy \
-  --role-name "$ROLE_NAME" \
-  --policy-arn arn:aws:iam::aws:policy/AmazonEC2FullAccess
-
-aws iam attach-role-policy \
-  --role-name "$ROLE_NAME" \
-  --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
-
-aws iam attach-role-policy \
-  --role-name "$ROLE_NAME" \
-  --policy-arn arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+# Attach policies (idempotent — skips if already attached)
+echo "Attaching policies..."
+for POLICY_ARN in \
+  arn:aws:iam::aws:policy/AmazonEC2FullAccess \
+  arn:aws:iam::aws:policy/AmazonS3FullAccess \
+  arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess; do
+  if ! aws iam list-attached-role-policies --role-name "$ROLE_NAME" --query "AttachedPolicies[?PolicyArn=='$POLICY_ARN'].PolicyArn" --output text | grep -q "$POLICY_ARN"; then
+    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn "$POLICY_ARN"
+    echo "  ✅ Attached $POLICY_ARN"
+  else
+    echo "  ⏭️  Already attached: $POLICY_ARN"
+  fi
+done
 
 ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
 echo ""

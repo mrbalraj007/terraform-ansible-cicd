@@ -13,11 +13,10 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "your-tfstate-bucket"
+    bucket         = "terraform-ansible-cicd"     # replace your region here
     key            = "terraform-ansible/terraform.tfstate"
-    region         = "ap-southeast-2"
-    dynamodb_table = "terraform-lock"
-    encrypt        = true
+    region         = "us-east-1"
+  
   }
 }
 
