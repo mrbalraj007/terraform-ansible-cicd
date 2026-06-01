@@ -95,6 +95,16 @@ resource "aws_instance" "web" {
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   associate_public_ip_address = true
 
+  instance_market_options {
+    market_type = "spot"
+
+    spot_options {
+      max_price                      = var.spot_max_price
+      spot_instance_type             = "persistent"
+      instance_interruption_behavior = "stop"
+    }
+  }
+
   root_block_device {
     volume_size           = 30
     volume_type           = "gp3"
@@ -120,6 +130,16 @@ resource "aws_instance" "app" {
   subnet_id                   = data.aws_subnets.default.ids[count.index % length(data.aws_subnets.default.ids)]
   vpc_security_group_ids      = [aws_security_group.app_sg.id]
   associate_public_ip_address = true
+
+  instance_market_options {
+    market_type = "spot"
+
+    spot_options {
+      max_price                      = var.spot_max_price
+      spot_instance_type             = "persistent"
+      instance_interruption_behavior = "stop"
+    }
+  }
 
   root_block_device {
     volume_size           = 30

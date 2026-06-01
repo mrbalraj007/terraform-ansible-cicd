@@ -46,6 +46,12 @@ variable "allowed_ssh_cidr" {
   default     = ["0.0.0.0/0"]
 }
 
+variable "spot_max_price" {
+  description = "Maximum spot price (empty string = on-demand price). Set to \"0.016\" for t3.micro spot."
+  type        = string
+  default     = ""
+}
+
 variable "common_tags" {
   description = "Tags applied to every resource"
   type        = map(string)
