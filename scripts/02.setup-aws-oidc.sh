@@ -6,7 +6,7 @@
 set -euo pipefail
 
 GITHUB_ORG="mrbalraj007"
-GITHUB_REPO="terraform-ansible-cicd"
+GITHUB_REPO="aws-oidc-terraform-ansible-cicd"
 AWS_REGION="us-east-1"
 ROLE_NAME="github-actions-terraform-role"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
