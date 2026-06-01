@@ -50,7 +50,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip install ansible boto3 botocore
-          ansible-galaxy collection install amazon.aws ansible.posix community.general
+          ansible-galaxy collection install -r requirements.yml
 
       - name: Write SSH private key
         run: |

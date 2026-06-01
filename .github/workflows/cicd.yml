@@ -27,8 +27,7 @@ on:
 
 env:
   AWS_REGION:       us-east-1
-  TF_VERSION:       1.7.5
-  ANSIBLE_VERSION:  "9.5.1"
+  TF_VERSION:       latest
   WORKING_DIR_TF:   terraform
   WORKING_DIR_ANS:  ansible
 
@@ -148,10 +147,7 @@ jobs:
       - name: Install Ansible and AWS dependencies
         run: |
           pip install --upgrade pip
-          pip install \
-            ansible==${{ env.ANSIBLE_VERSION }} \
-            boto3 \
-            botocore
+          pip install ansible boto3 botocore
 
       # ── Ansible Collections ────────────────────────────────
       - name: Install Ansible Collections
