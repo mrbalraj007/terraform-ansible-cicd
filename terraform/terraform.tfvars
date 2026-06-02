@@ -29,7 +29,7 @@ servers = [
     name          = "web-server"
     os_type       = "amazon_linux"
     instance_type = "t3.medium"
-    count         = 2
+    count         = 1
     volume_size   = 30
     role          = "web"
   },
@@ -38,7 +38,15 @@ servers = [
     os_type       = "amazon_linux"
     instance_type = "t3.medium"
     count         = 1
-    volume_size   = 50
+    volume_size   = 30
+    role          = "app"
+  },
+  {
+    name          = "win-server"
+    os_type       = "windows"
+    instance_type = "t3.medium"
+    count         = 1
+    volume_size   = 30
     role          = "app"
   },
 ]
