@@ -54,6 +54,20 @@ ${file("../scripts/configure-winrm.ps1")}
 </powershell>
 EOWIN
   )
+
+  # Key pair name used across all instances
+  key_pair_name = "${var.project_name}-${var.environment}-deployer-key"
+}
+
+# ──── Shared Key Pair (created once, referenced by all instance groups) ─────
+resource "aws_key_pair" "deployer" {
+  key_name   = local.key_pair_name
+  public_key = var.ssh_public_key
+
+  tags = merge(var.common_tags, {
+    Environment = var.environment
+    Project     = var.project_name
+  })
 }
 
 # ──── EC2 Instance Groups (one module call per server definition) ───────────
@@ -78,7 +92,7 @@ module "server_group" {
   environment              = each.value.environment != "" ? each.value.environment : var.environment
   vpc_id                   = data.aws_vpc.default.id
   subnet_ids               = data.aws_subnets.default.ids
-  ssh_public_key           = var.ssh_public_key
+  key_name                 = aws_key_pair.deployer.key_name
   spot_max_price           = each.value.spot_price != "" ? each.value.spot_price : var.spot_max_price
   project_name             = var.project_name
   common_tags              = var.common_tags
