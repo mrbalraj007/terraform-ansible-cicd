@@ -69,3 +69,6 @@ GitHub Push
     ├── 02-ansible-configure.yml
     └── 03-full-cicd.yml   # Combined pipeline
 ```
+
+
+# [agents-observe](https://github.com/simple10/agents-observe)

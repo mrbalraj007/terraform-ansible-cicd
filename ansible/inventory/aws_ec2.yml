@@ -1,7 +1,7 @@
 # ============================================================
 # ansible/inventory/aws_ec2.yml
 # Dynamic Inventory — aws_ec2 plugin
-# Discovers instances by Tag: Role=web, Project=tf-ansible-demo
+# Discovers instances by Tag: Project=tf-ansible-demo (both web and app)
 # ============================================================
 
 plugin: amazon.aws.aws_ec2
@@ -12,7 +12,6 @@ regions:
 # ── Filter to only YOUR project instances ───────────────────
 filters:
   tag:Project: tf-ansible-demo
-  tag:Role: web
   instance-state-name: running
 
 # ── Group instances by tag values ───────────────────────────
