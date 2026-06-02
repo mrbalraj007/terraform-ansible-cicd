@@ -19,7 +19,7 @@ filters:
 
 # ── How to connect to instances ──
 hostnames:
-  - public-ip-address                    # Use public IP as hostname
+  - ip-address                        # Use public IP as hostname (unique per instance)
 
 # ── Build groups from EC2 tags ──
 keyed_groups:
