@@ -21,7 +21,7 @@ jobs:
     secrets: inherit
 
   configure:
-    name: "Ansible Configure"
+    name: "Ansible Configure (Multi-OS)"
     needs: provision
     uses: ./.github/workflows/02-ansible-configure.yml
     secrets: inherit

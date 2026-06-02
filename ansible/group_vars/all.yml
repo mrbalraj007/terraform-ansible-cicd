@@ -1,0 +1,20 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Global variables applied to all hosts
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Monitoring
+enable_monitoring: "{{ 'true' if tags.Environment == 'prod' else 'false' }}"
+
+# Common packages (OS-specific roles handle installation)
+common_packages:
+  - wget
+  - unzip
+  - git
+  - curl
+
+# Deployment metadata
+deployment_tool: "Terraform + Ansible"
+managed_by: "Terraform"
+
+# MOTD template parameters
+motd_template: motd.j2

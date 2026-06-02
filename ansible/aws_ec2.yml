@@ -1,44 +1,55 @@
-# ──────────────────────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # Ansible AWS EC2 Dynamic Inventory Plugin
 # Docs: https://docs.ansible.com/ansible/latest/collections/amazon/aws/aws_ec2_inventory.html
-# ──────────────────────────────────────────────────────────────
+#
+# This inventory auto-discovers EC2 instances tagged by Terraform and groups
+# them by Role, OS_Type, and Environment for targeted playbook execution.
+# ─────────────────────────────────────────────────────────────────────────────
+
 plugin: amazon.aws.aws_ec2
 
-# AWS credentials come from environment variables:
+# AWS credentials come from environment variables (set in GitHub Actions):
 #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
-# (set as GitHub Secrets — no hardcoded creds here)
 
 regions:
   - us-east-1
 
-# Only include running instances
+# Only include running instances managed by our project
 filters:
   instance-state-name: running
-  "tag:Project": tf-ansible-demo        # Match Terraform tag
+  "tag:Project": tf-ansible-demo
   "tag:ManagedBy": Terraform
 
-# ── How to connect to instances ──
+# ── How to connect ──────────────────────────────────────────────────────────
 hostnames:
-  - ip-address                        # Use public IP as hostname (unique per instance)
+  - ip-address
 
-# ── Build groups from EC2 tags ──
+# ── Build Ansible groups from EC2 tags ──────────────────────────────────────
 keyed_groups:
-  # Creates groups: tag_Role_web, tag_Role_app
+  # Creates groups: tag_Role_web, tag_Role_app, tag_Role_db, etc.
   - key: tags.Role
     prefix: tag_Role
     separator: "_"
 
-  # Creates groups: tag_Environment_dev, tag_Environment_prod
+  # Creates groups: tag_OS_Type_amazon_linux, tag_OS_Type_ubuntu, etc.
+  - key: tags.OS_Type
+    prefix: tag_OS_Type
+    separator: "_"
+
+  # Creates groups: tag_Environment_dev, tag_Environment_staging, etc.
   - key: tags.Environment
     prefix: tag_Environment
     separator: "_"
 
-  # Creates groups based on instance type
+  # Creates groups: instance_type_t3_medium, instance_type_t3_large, etc.
   - key: instance_type
     prefix: instance_type
 
-# ── Variables available on every host ──
+# ── Host variables (composed for each instance) ─────────────────────────────
 compose:
   ansible_host: public_ip_address
-  ansible_user: "ec2-user"              # Amazon Linux 2 default user
-  # ansible_ssh_private_key_file is set in ansible.cfg
+  # ansible_user is set per OS in group_vars/ or dynamically below:
+  # ansible_user: "'ec2-user' if 'amazon_linux' in tags.OS_Type else 'ubuntu' if 'ubuntu' in tags.OS_Type else 'Administrator'"
+  #
+  # Better: set ansible_user via group_vars/tag_OS_Type_*.yml
+  # See group_vars/ for OS-specific connection parameters.

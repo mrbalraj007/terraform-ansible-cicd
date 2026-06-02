@@ -31,14 +31,16 @@ permissions:
   contents: read
 
 jobs:
-  # ─────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
   # Job 1: Validate & Plan
-  # ─────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
   terraform-plan:
     name: "Terraform Plan"
     runs-on: ubuntu-latest
     outputs:
       tfplan_exitcode: ${{ steps.plan.outputs.exitcode }}
+      has_servers: ${{ steps.parse-servers.outputs.has_servers }}
+      server_count: ${{ steps.parse-servers.outputs.server_count }}
 
     steps:
       - name: Checkout repository
@@ -68,6 +70,45 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform fmt -check -recursive
 
+      - name: Parse server definitions for summary
+        id: parse-servers
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          # Extract server count and OS types from tfvars
+          if grep -q "^servers" terraform.tfvars; then
+            echo "has_servers=true" >> $GITHUB_OUTPUT
+            COUNT=$(grep -c "os_type" terraform.tfvars || true)
+            echo "server_count=$COUNT" >> $GITHUB_OUTPUT
+
+            echo "### Server Inventory" >> $GITHUB_STEP_SUMMARY
+            echo '| # | Name | OS Type | Instance Type | Count | Role |' >> $GITHUB_STEP_SUMMARY
+            echo '|---|------|---------|---------------|-------|------|' >> $GITHUB_STEP_SUMMARY
+            # Best-effort parse of server entries
+            python3 -c "
+import re, sys
+try:
+    with open('terraform.tfvars') as f:
+        content = f.read()
+    # Simple parsing of the servers list
+    blocks = re.findall(r'\{([^}]+)\}', content)
+    i = 0
+    for block in blocks:
+        name = re.search(r'name\s*=\s*\"([^\"]+)\"', block)
+        os_type = re.search(r'os_type\s*=\s*\"([^\"]+)\"', block)
+        itype = re.search(r'instance_type\s*=\s*\"([^\"]+)\"', block)
+        cnt = re.search(r'count\s*=\s*(\d+)', block)
+        role = re.search(r'role\s*=\s*\"([^\"]+)\"', block)
+        if name or os_type:
+            i += 1
+            print(f'| {i} | {(name.group(1) if name else \"?\")} | {(os_type.group(1) if os_type else \"?\")} | {(itype.group(1) if itype else \"?\")} | {(cnt.group(1) if cnt else \"1\")} | {(role.group(1) if role else \"?\")} |')
+except Exception as e:
+    print(f'Warning: could not parse servers: {e}', file=sys.stderr)
+" >> $GITHUB_STEP_SUMMARY || true
+          else
+            echo "has_servers=false" >> $GITHUB_OUTPUT
+            echo "server_count=0" >> $GITHUB_OUTPUT
+          fi
+
       - name: Terraform Plan
         id: plan
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -86,9 +127,9 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}/tfplan
           retention-days: 1
 
-  # ─────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
   # Job 2: Apply (only on main push or manual apply)
-  # ─────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
   terraform-apply:
     name: "Terraform Apply"
     runs-on: ubuntu-latest
@@ -96,7 +137,7 @@ jobs:
     if: |
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event.inputs.action == 'apply')
-    environment: dev        # Requires manual approval if configured
+    environment: dev
 
     steps:
       - name: Checkout repository
@@ -132,6 +173,25 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
           terraform output -json > ../terraform-outputs.json
+          echo "### Provisioned Infrastructure" >> $GITHUB_STEP_SUMMARY
+          echo '```json' >> $GITHUB_STEP_SUMMARY
+          python3 -c "
+import json
+with open('../terraform-outputs.json') as f:
+    data = json.load(f)
+# Pretty-print summary
+if 'deployment_summary' in data:
+    print(data['deployment_summary']['value'])
+if 'all_public_ips' in data:
+    ips = data['all_public_ips']['value']
+    print(f\"Total instances: {len(ips)}\")
+    print(f\"Public IPs: {', '.join(ips)}\")
+if 'windows_public_ips' in data:
+    win_ips = data['windows_public_ips']['value']
+    if win_ips:
+        print(f\"Windows IPs: {', '.join(win_ips)}\")
+" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
           cat ../terraform-outputs.json
 
       - name: Upload Terraform outputs
@@ -139,11 +199,34 @@ jobs:
         with:
           name: terraform-outputs
           path: terraform-outputs.json
-          retention-days: 1
+          retention-days: 7
 
-  # ─────────────────────────────────────────
+      - name: Generate Ansible inventory metadata
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          # Generate a host-vars file that Ansible can use alongside dynamic inventory
+          terraform output -json | python3 -c "
+import json, os, sys
+
+data = json.load(sys.stdin)
+output_dir = '../ansible/group_vars'
+os.makedirs(output_dir, exist_ok=True)
+
+# Generate ansible_user mapping by OS type
+# This is consumed by the Ansible dynamic inventory
+if 'admin_user_map' in data:
+    admin_map = data['admin_user_map']['value']
+    # Write as YAML
+    with open(f'{output_dir}/generated_host_map.yml', 'w') as f:
+        f.write('# Auto-generated from Terraform output\n')
+        f.write('# Maps public IPs to their admin username\n')
+        for ip, user in admin_map.items():
+            f.write(f'{ip}: {user}\n')
+    print(f'Generated admin user map: {len(admin_map)} entries')
+"
+  # ───────────────────────────────────────────────────────────────────────────
   # Job 3: Destroy (manual only)
-  # ─────────────────────────────────────────
+  # ───────────────────────────────────────────────────────────────────────────
   terraform-destroy:
     name: "Terraform Destroy"
     runs-on: ubuntu-latest

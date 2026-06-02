@@ -1,0 +1,20 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Windows specific connection & package variables
+# ─────────────────────────────────────────────────────────────────────────────
+
+ansible_user: Administrator
+ansible_connection: winrm
+ansible_winrm_server_cert_validation: ignore
+ansible_winrm_transport: ntlm
+ansible_port: 5986
+ansible_become: true
+ansible_become_method: runas
+ansible_become_user: SYSTEM
+
+# Package manager
+package_manager: chocolatey
+
+# Web server
+web_server_package: IIS
+web_server_service: W3SVC
+web_server_root: C:\inetpub\wwwroot

@@ -1,6 +1,14 @@
-##############################################################
-# main.tf - EC2 Instances for Ansible Dynamic Inventory
-##############################################################
+###############################################################################
+# main.tf — Root Module
+# Provisions multiple EC2 instance groups from the `servers` variable using
+# the reusable ec2_instance module. Each group gets its own security group,
+# key pair references, and OS-appropriate configuration.
+#
+# Ansible dynamic inventory discovers instances via tags:
+#   - tag:OS_Type  → group (e.g., tag_OS_Type_ubuntu, tag_OS_Type_windows)
+#   - tag:Role     → group (e.g., tag_Role_web, tag_Role_app)
+#   - tag:Environment → group (e.g., tag_Environment_dev)
+###############################################################################
 
 terraform {
   required_version = ">= 1.5.0"
@@ -13,10 +21,9 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "terraform-ansible-cicd" # replace your region here
+    bucket = "terraform-ansible-cicd" # Replace with your globally unique bucket name
     key    = "terraform-ansible/terraform.tfstate"
     region = "us-east-1"
-
   }
 }
 
@@ -24,18 +31,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-data "aws_ami" "amazon_linux_2023" {
-  most_recent = true
-  owners      = ["amazon"]
-  filter {
-    name   = "name"
-    values = ["al2023-ami-*-kernel-6.1-x86_64"]
-  }
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-}
+# ──── Data Sources ──────────────────────────────────────────────────────────
 
 data "aws_vpc" "default" {
   default = true
@@ -48,111 +44,33 @@ data "aws_subnets" "default" {
   }
 }
 
-resource "aws_security_group" "app_sg" {
-  name        = "${var.project_name}-app-sg"
-  description = "Security group for ${var.project_name} EC2 instances"
-  vpc_id      = data.aws_vpc.default.id
+# ──── EC2 Instance Groups (one module call per server definition) ───────────
+# Each entry in var.servers creates a group of EC2 instances with matching
+# OS, security group, tags, and optional spot pricing.
 
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = var.allowed_ssh_cidr
+module "server_group" {
+  source = "./modules/ec2_instance"
+
+  for_each = {
+    for idx, s in var.servers :
+    "${s.role}-${s.os_type}-${idx}" => s
   }
 
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.common_tags, { Name = "${var.project_name}-app-sg" })
-}
-
-resource "aws_key_pair" "deployer" {
-  key_name   = "${var.project_name}-deployer-key"
-  public_key = var.ssh_public_key
-  tags       = var.common_tags
-}
-
-# ── Web instances — tagged Role=web for Ansible grouping ──
-resource "aws_instance" "web" {
-  count                       = var.web_instance_count
-  ami                         = data.aws_ami.amazon_linux_2023.id
-  instance_type               = var.instance_type
-  key_name                    = aws_key_pair.deployer.key_name
-  subnet_id                   = data.aws_subnets.default.ids[count.index % length(data.aws_subnets.default.ids)]
-  vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  associate_public_ip_address = true
-
-  instance_market_options {
-    market_type = "spot"
-
-    spot_options {
-      max_price                      = var.spot_max_price
-      spot_instance_type             = "persistent"
-      instance_interruption_behavior = "stop"
-    }
-  }
-
-  root_block_device {
-    volume_size           = 30
-    volume_type           = "gp3"
-    delete_on_termination = true
-    encrypted             = true
-  }
-
-  tags = merge(var.common_tags, {
-    Name        = "${var.project_name}-web-${count.index + 1}"
-    Role        = "web"
-    Environment = var.environment
-    Project     = var.project_name
-    ManagedBy   = "Terraform"
-  })
-}
-
-# ── App instances — tagged Role=app for Ansible grouping ──
-resource "aws_instance" "app" {
-  count                       = var.app_instance_count
-  ami                         = data.aws_ami.amazon_linux_2023.id
-  instance_type               = var.instance_type
-  key_name                    = aws_key_pair.deployer.key_name
-  subnet_id                   = data.aws_subnets.default.ids[count.index % length(data.aws_subnets.default.ids)]
-  vpc_security_group_ids      = [aws_security_group.app_sg.id]
-  associate_public_ip_address = true
-
-  instance_market_options {
-    market_type = "spot"
-
-    spot_options {
-      max_price                      = var.spot_max_price
-      spot_instance_type             = "persistent"
-      instance_interruption_behavior = "stop"
-    }
-  }
-
-  root_block_device {
-    volume_size           = 30
-    volume_type           = "gp3"
-    delete_on_termination = true
-    encrypted             = true
-  }
-
-  tags = merge(var.common_tags, {
-    Name        = "${var.project_name}-app-${count.index + 1}"
-    Role        = "app"
-    Environment = var.environment
-    Project     = var.project_name
-    ManagedBy   = "Terraform"
-  })
+  instance_name            = each.value.name
+  os_type                  = each.value.os_type
+  ami_id                   = local.ami_ids[each.value.os_type]
+  instance_type            = each.value.instance_type
+  instance_count           = each.value.count
+  volume_size              = each.value.volume_size
+  role                     = each.value.role
+  environment              = each.value.environment != "" ? each.value.environment : var.environment
+  vpc_id                   = data.aws_vpc.default.id
+  subnet_ids               = data.aws_subnets.default.ids
+  ssh_public_key           = var.ssh_public_key
+  spot_max_price           = each.value.spot_price != "" ? each.value.spot_price : var.spot_max_price
+  project_name             = var.project_name
+  common_tags              = var.common_tags
+  allowed_ssh_cidr         = var.allowed_ssh_cidr
+  allowed_http_cidr        = var.allowed_http_cidr
+  enable_volume_encryption = var.enable_volume_encryption
 }

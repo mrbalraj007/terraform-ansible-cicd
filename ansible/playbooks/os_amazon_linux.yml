@@ -1,0 +1,74 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# os_amazon_linux.yml — Amazon Linux 2023 Configuration Playbook
+#
+# Run as a standalone playbook or imported via site.yml.
+# Targets hosts in the tag_OS_Type_amazon_linux group.
+# Uses dnf package manager (Amazon Linux 2023 default).
+# ══════════════════════════════════════════════════════════════════════════════
+
+- name: "Amazon Linux OS Configuration"
+  hosts: tag_OS_Type_amazon_linux
+  become: true
+  gather_facts: true
+
+  tasks:
+    # ── Package Management ────────────────────────────────────────────────
+    - name: "Update all packages"
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: "Install common utilities"
+      ansible.builtin.dnf:
+        name:
+          - wget
+          - unzip
+          - git
+          - curl
+          - tree
+          - htop
+        state: present
+
+    # ── Timezone ──────────────────────────────────────────────────────────
+    - name: "Set timezone to UTC"
+      community.general.timezone:
+        name: "{{ timezone | default('UTC') }}"
+
+    # ── MOTD ──────────────────────────────────────────────────────────────
+    - name: "Ensure /etc/motd shows instance info"
+      ansible.builtin.template:
+        src: motd.j2
+        dest: /etc/motd
+        mode: "0644"
+
+    # ── Web Server (conditional on role) ──────────────────────────────────
+    - name: "Install web server (if role is web or app)"
+      ansible.builtin.dnf:
+        name: "{{ web_server_package | default('nginx') }}"
+        state: present
+      when: "'web' in group_names or 'app' in group_names or tags.Role is defined and tags.Role in ['web', 'app']"
+
+    - name: "Deploy web content if nginx web server role"
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: "{{ web_server_root | default('/usr/share/nginx/html') }}/index.html"
+        owner: root
+        group: root
+        mode: "0644"
+      when: "'web' in group_names or 'app' in group_names"
+      notify: "Restart Nginx"
+
+    - name: "Ensure web server is started and enabled"
+      ansible.builtin.service:
+        name: "{{ web_server_service | default('nginx') }}"
+        state: started
+        enabled: true
+      when: "'web' in group_names or 'app' in group_names"
+
+    - name: "Verify web server is listening on port 80"
+      ansible.builtin.wait_for:
+        port: 80
+        host: "0.0.0.0"
+        timeout: 10
+      when: "'web' in group_names or 'app' in group_names"

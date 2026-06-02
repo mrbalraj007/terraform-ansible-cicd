@@ -1,30 +1,60 @@
-# ============================================================
+# ══════════════════════════════════════════════════════════════════════════════
 # roles/common/tasks/main.yml
-# ============================================================
+#
+# OS-agnostic common setup tasks.
+# Uses the {{ package_manager }} variable (set in group_vars/tag_OS_Type_*.yml)
+# to automatically select the right package manager for each OS.
+# ══════════════════════════════════════════════════════════════════════════════
 
 ---
-- name: Update all packages
+# ── Package Manager Detection ───────────────────────────────────────────────
+- name: "Set package manager facts based on OS family"
+  ansible.builtin.set_fact:
+    pkg_mgr: "{{ 'apt' if ansible_os_family == 'Debian' else 'dnf' if ansible_os_family == 'RedHat' and ansible_distribution_major_version | int >= 8 else 'yum' }}"
+    cache_valid: "{{ 3600 if ansible_os_family == 'Debian' else omit }}"
+  when: ansible_os_family != "Windows"
+
+# ── Package Updates ─────────────────────────────────────────────────────────
+- name: "Update all packages (Debian/Ubuntu)"
+  ansible.builtin.apt:
+    name: "*"
+    state: latest
+    update_cache: true
+    cache_valid_time: "{{ cache_valid | default(3600) }}"
+  when: ansible_os_family == "Debian"
+
+- name: "Update all packages (RedHat/Amazon Linux)"
   ansible.builtin.dnf:
     name: "*"
     state: latest
     update_cache: true
+  when: ansible_os_family == "RedHat"
 
-- name: Install common utilities
-  ansible.builtin.dnf:
-    name:
-      - wget
-      - unzip
-      - git
+# ── Common Utilities ────────────────────────────────────────────────────────
+- name: "Install common utilities (Debian/Ubuntu)"
+  ansible.builtin.apt:
+    name: "{{ common_packages | default(['wget', 'unzip', 'git', 'curl']) }}"
     state: present
-  # NOTE: curl is intentionally excluded — Amazon Linux 2023 ships
-  # curl-minimal, which conflicts with the full curl package.
+  when: ansible_os_family == "Debian"
 
-- name: Set timezone to UTC
+- name: "Install common utilities (RedHat/Amazon Linux)"
+  ansible.builtin.dnf:
+    name: "{{ common_packages | default(['wget', 'unzip', 'git', 'curl']) }}"
+    state: present
+  when: ansible_os_family == "RedHat"
+  # NOTE: curl maps to curl-minimal on Amazon Linux 2023 — the dnf
+  # resolver handles the conflict automatically.
+
+# ── Timezone ────────────────────────────────────────────────────────────────
+- name: "Set timezone to UTC"
   community.general.timezone:
-    name: UTC
+    name: "{{ timezone | default('UTC') }}"
+  when: ansible_os_family != "Windows"
 
-- name: Ensure /etc/motd shows instance info
+# ── MOTD ────────────────────────────────────────────────────────────────────
+- name: "Ensure /etc/motd shows instance info"
   ansible.builtin.template:
     src: motd.j2
     dest: /etc/motd
     mode: "0644"
+  when: ansible_os_family != "Windows"

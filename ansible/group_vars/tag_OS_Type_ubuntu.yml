@@ -1,0 +1,19 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Ubuntu specific connection & package variables
+# ─────────────────────────────────────────────────────────────────────────────
+
+ansible_user: ubuntu
+ansible_become: true
+ansible_become_method: sudo
+
+# Package manager
+package_manager: apt
+update_cache: true
+
+# Web server
+web_server_package: nginx
+web_server_service: nginx
+web_server_root: /var/www/html
+
+# System
+timezone: UTC

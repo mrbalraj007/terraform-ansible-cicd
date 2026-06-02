@@ -1,0 +1,102 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# os_redhat.yml — Red Hat Enterprise Linux 9 Configuration Playbook
+#
+# Run as a standalone playbook or imported via site.yml.
+# Targets hosts in the tag_OS_Type_redhat group.
+# Uses dnf package manager.
+# ══════════════════════════════════════════════════════════════════════════════
+
+- name: "RedHat OS Configuration"
+  hosts: tag_OS_Type_redhat
+  become: true
+  gather_facts: true
+
+  tasks:
+    # ── Subscription Management ───────────────────────────────────────────
+    - name: "Register system with Red Hat Subscription Manager (if RHSM credentials provided)"
+      community.general.redhat_subscription:
+        state: present
+        username: "{{ rhsm_username | default(omit) }}"
+        password: "{{ rhsm_password | default(omit) }}"
+        auto_attach: true
+      when: rhsm_username is defined and rhsm_username != ""
+
+    # ── Package Management ────────────────────────────────────────────────
+    - name: "Enable EPEL repository"
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+      when: enable_epel | default(false)
+
+    - name: "Update all packages"
+      ansible.builtin.dnf:
+        name: "*"
+        state: latest
+        update_cache: true
+
+    - name: "Install common utilities"
+      ansible.builtin.dnf:
+        name:
+          - wget
+          - unzip
+          - git
+          - curl
+          - tree
+          - htop
+          - policycoreutils-python-utils
+        state: present
+
+    # ── Timezone ──────────────────────────────────────────────────────────
+    - name: "Set timezone to UTC"
+      community.general.timezone:
+        name: "{{ timezone | default('UTC') }}"
+
+    # ── MOTD ──────────────────────────────────────────────────────────────
+    - name: "Ensure /etc/motd shows instance info"
+      ansible.builtin.template:
+        src: motd.j2
+        dest: /etc/motd
+        mode: "0644"
+
+    # ── SELinux (permissive for nginx, can be tightened per environment) ──
+    - name: "Set SELinux to permissive mode (dev/staging) or enforcing (prod)"
+      ansible.posix.selinux:
+        policy: targeted
+        state: "{{ 'enforcing' if (tags.Environment | default('dev')) == 'prod' else 'permissive' }}"
+
+    # ── Web Server (conditional on role) ──────────────────────────────────
+    - name: "Install web server (if role is web or app)"
+      ansible.builtin.dnf:
+        name: "{{ web_server_package | default('nginx') }}"
+        state: present
+      when: "'web' in group_names or 'app' in group_names or tags.Role is defined and tags.Role in ['web', 'app']"
+
+    - name: "Configure SELinux to allow HTTP"
+      ansible.builtin.command:
+        cmd: "setsebool -P httpd_can_network_connect 1"
+      when: ansible_selinux.status == "enabled" and ("'web' in group_names or 'app' in group_names")
+      changed_when: false
+
+    - name: "Deploy web content"
+      ansible.builtin.template:
+        src: index.html.j2
+        dest: "{{ web_server_root | default('/usr/share/nginx/html') }}/index.html"
+        owner: root
+        group: root
+        mode: "0644"
+      when: "'web' in group_names or 'app' in group_names"
+      notify: "Restart Nginx"
+
+    - name: "Ensure web server is started and enabled"
+      ansible.builtin.service:
+        name: "{{ web_server_service | default('nginx') }}"
+        state: started
+        enabled: true
+      when: "'web' in group_names or 'app' in group_names"
+
+    - name: "Verify web server is listening on port 80"
+      ansible.builtin.wait_for:
+        port: 80
+        host: "0.0.0.0"
+        timeout: 10
+      when: "'web' in group_names or 'app' in group_names"
