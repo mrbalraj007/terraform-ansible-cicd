@@ -40,14 +40,12 @@ locals {
 
   # ── Security group name ──────────────────────────────────────────────────
   sg_name = "${var.project_name}-${var.environment}-${var.role}-${var.os_type}-sg"
-
-  key_name = "${var.project_name}-${var.environment}-deployer-key"
 }
 
 # ──── Security Group ───────────────────────────────────────────────────────
 resource "aws_security_group" "this" {
   name        = local.sg_name
-  description = "Security group for ${var.instance_name} (${var.os_type}) — ${var.environment}"
+  description = "Security group for ${var.instance_name} (${var.os_type}) - ${var.environment}"
   vpc_id      = var.vpc_id
 
   dynamic "ingress" {
@@ -77,16 +75,7 @@ resource "aws_security_group" "this" {
   })
 }
 
-# ──── SSH/RDP Key Pair ─────────────────────────────────────────────────────
-resource "aws_key_pair" "this" {
-  key_name   = local.key_name
-  public_key = var.ssh_public_key
-
-  tags = merge(var.common_tags, {
-    Environment = var.environment
-    Project     = var.project_name
-  })
-}
+# ──── SSH/RDP Key Pair (name passed from root — key created by root module) ──
 
 # ──── EC2 Instances ────────────────────────────────────────────────────────
 resource "aws_instance" "this" {
@@ -94,7 +83,7 @@ resource "aws_instance" "this" {
 
   ami                         = var.ami_id
   instance_type               = var.instance_type
-  key_name                    = aws_key_pair.this.key_name
+  key_name                    = var.key_name
   subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
   vpc_security_group_ids      = concat([aws_security_group.this.id], var.additional_sg_ids)
   associate_public_ip_address = var.assign_public_ip

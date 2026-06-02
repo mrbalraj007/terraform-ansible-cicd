@@ -56,10 +56,16 @@ variable "vpc_id" {
   type        = string
 }
 
+variable "key_name" {
+  description = "Name of an existing EC2 key pair to attach to instances"
+  type        = string
+}
+
 variable "ssh_public_key" {
-  description = "SSH public key content for EC2 key pair"
+  description = "SSH public key content for EC2 key pair (kept for backward compat)"
   type        = string
   sensitive   = true
+  default     = ""
 }
 
 variable "environment" {
