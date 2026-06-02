@@ -46,12 +46,6 @@ variable "allowed_ssh_cidr" {
   default     = ["0.0.0.0/0"]
 }
 
-variable "app_port" {
-  description = "Port the application server listens on"
-  type        = number
-  default     = 8080
-}
-
 variable "spot_max_price" {
   description = "Maximum spot price (empty string = on-demand price). Set to \"0.016\" for t3.micro spot."
   type        = string
