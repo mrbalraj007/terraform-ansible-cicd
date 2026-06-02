@@ -24,3 +24,8 @@ ansible/group_vars/all/vault.yml
 # OS
 .DS_Store
 Thumbs.db
+
+
+# Txt files
+.txt
+*.txt

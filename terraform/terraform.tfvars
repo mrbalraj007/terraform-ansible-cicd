@@ -8,7 +8,7 @@
 aws_region     = "us-east-1"
 project_name   = "tf-ansible-demo"
 environment    = "dev"
-spot_max_price = "0.0203"
+spot_max_price = "0.018"
 
 # ──── Server Definitions ────────────────────────────────────────────────────
 # os_type options: amazon_linux, ubuntu, redhat, windows
@@ -28,7 +28,7 @@ servers = [
   {
     name          = "web-server"
     os_type       = "amazon_linux"
-    instance_type = "t3.medium"
+    instance_type = "t3.micro"
     count         = 1
     volume_size   = 30
     role          = "web"
@@ -36,7 +36,7 @@ servers = [
   {
     name          = "app-server"
     os_type       = "amazon_linux"
-    instance_type = "t3.medium"
+    instance_type = "t3.micro"
     count         = 1
     volume_size   = 30
     role          = "app"
@@ -44,7 +44,7 @@ servers = [
   {
     name          = "win-server"
     os_type       = "windows"
-    instance_type = "t3.medium"
+    instance_type = "t3.micro"
     count         = 1
     volume_size   = 30
     role          = "app"
