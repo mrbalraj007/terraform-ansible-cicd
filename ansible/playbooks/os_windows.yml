@@ -1,0 +1,137 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# os_windows.yml — Windows Server 2022 Configuration Playbook
+#
+# Run as a standalone playbook or imported via site.yml.
+# Targets hosts in the tag_OS_Type_windows group.
+# Uses WinRM connection (see group_vars/tag_OS_Type_windows.yml).
+# ══════════════════════════════════════════════════════════════════════════════
+
+- name: "Windows Server OS Configuration"
+  hosts: tag_OS_Type_windows
+  gather_facts: true
+  vars:
+    ansible_connection: winrm
+
+  tasks:
+    # ── WinRM Configuration ───────────────────────────────────────────────
+    - name: "Ensure WinRM service is running"
+      ansible.windows.win_service:
+        name: WinRM
+        start_mode: auto
+        state: started
+
+    - name: "Configure WinRM for HTTPS"
+      ansible.windows.win_shell: |
+        $url = "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
+        $file = "$env:temp\ConfigureRemotingForAnsible.ps1"
+        (New-Object -TypeName System.Net.WebClient).DownloadFile($url, $file)
+        powershell.exe -File $file -ForceNewSSLCert -EnableCredSSP
+      args:
+        executable: powershell
+      changed_when: false
+      when: not ansible_winrm_cert_present | default(false)
+
+    # ── Windows Updates ───────────────────────────────────────────────────
+    - name: "Install all critical and security Windows Updates"
+      ansible.windows.win_updates:
+        category_names:
+          - CriticalUpdates
+          - SecurityUpdates
+          - UpdateRollups
+        state: installed
+        reboot: true
+        reboot_timeout: 600
+      register: win_updates_result
+
+    - name: "Display Windows Update result"
+      ansible.builtin.debug:
+        var: win_updates_result
+
+    # ── Chocolatey Package Manager ────────────────────────────────────────
+    - name: "Install Chocolatey"
+      ansible.windows.win_shell:
+        cmd: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        executable: powershell
+      args:
+        creates: C:\ProgramData\chocolatey\choco.exe
+      register: choco_install
+      changed_when: choco_install.rc == 0
+
+    # ── Common Tools ──────────────────────────────────────────────────────
+    - name: "Install common tools via Chocolatey"
+      ansible.windows.win_chocolatey:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - git
+        - curl
+        - wget
+        - vim
+        - 7zip
+
+    # ── MOTD (Windows equivalent: legal notice caption) ───────────────────
+    - name: "Set legal notice caption (Windows MOTD equivalent)"
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System
+        name: "{{ item.name }}"
+        data: "{{ item.data }}"
+        type: string
+      loop:
+        - { name: "legalnoticecaption", data: "Terraform + Ansible Managed Instance" }
+        - { name: "legalnoticetext", data: "Instance managed by Terraform & Ansible via GitHub Actions" }
+
+    # ── IIS Web Server (conditional on role) ──────────────────────────────
+    - name: "Install IIS Web Server (if role is web or app)"
+      ansible.windows.win_feature:
+        name: Web-Server
+        state: present
+        include_management_tools: true
+      when: "'web' in group_names or 'app' in group_names or tags.Role is defined and tags.Role in ['web', 'app']"
+
+    - name: "Ensure IIS is started"
+      ansible.windows.win_service:
+        name: W3SVC
+        start_mode: auto
+        state: started
+      when: "'web' in group_names or 'app' in group_names"
+
+    - name: "Deploy IIS default page"
+      ansible.windows.win_copy:
+        content: |
+          <!DOCTYPE html>
+          <html>
+          <head><title>{{ ansible_hostname }}</title></head>
+          <body>
+            <h1>Deployed by Ansible via GitHub Actions</h1>
+            <p>Host: {{ ansible_hostname }}</p>
+            <p>Public IP: {{ ansible_host }}</p>
+            <p>OS: Windows Server {{ ansible_distribution_version }}</p>
+            <p>Environment: {{ tags['Environment'] | default('unknown') }}</p>
+          </body>
+          </html>
+        dest: C:\inetpub\wwwroot\index.html
+      when: "'web' in group_names or 'app' in group_names"
+
+    # ── Firewall ──────────────────────────────────────────────────────────
+    - name: "Open HTTP port 80 in Windows Firewall"
+      ansible.windows.win_firewall_rule:
+        name: HTTP-Port-80
+        localport: 80
+        action: allow
+        direction: in
+        protocol: tcp
+        state: present
+        enabled: true
+      when: "'web' in group_names or 'app' in group_names"
+
+    - name: "Verify IIS is responding on port 80"
+      ansible.windows.win_uri:
+        url: http://localhost
+        return_content: yes
+      register: iis_check
+      when: "'web' in group_names or 'app' in group_names"
+      failed_when: iis_check.status_code != 200
+      changed_when: false

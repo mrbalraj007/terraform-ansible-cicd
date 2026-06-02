@@ -1,13 +1,81 @@
-# ============================================================
-# terraform/terraform.tfvars.example
-# Copy to terraform.tfvars for local testing (never commit!)
-# ============================================================
+###############################################################################
+# terraform.tfvars.example
+# Copy to terraform.tfvars and customize for your deployment.
+#
+# This example shows all supported OS types.
+# For your actual deployment, only include the server groups you need.
+###############################################################################
 
-aws_region     = "ap-southeast-2"
-project_name   = "tf-ansible-demo"
-environment    = "dev"
-instance_count = 2
-instance_type  = "t3.micro"
+aws_region         = "us-east-1"
+project_name       = "tf-ansible-demo"
+environment        = "dev"
+spot_max_price     = "0.020"
 
-# ssh_public_key is injected via GitHub Secret — do not hardcode here
-# ssh_public_key = "ssh-rsa AAAA..."
+# ──── Server Definitions ────────────────────────────────────────────────────
+# os_type options:
+#   amazon_linux  — Amazon Linux 2023 (dnf, ec2-user, nginx)
+#   ubuntu        — Ubuntu 24.04 LTS   (apt, ubuntu, nginx)
+#   redhat        - Red Hat Enterprise Linux 9 (dnf, ec2-user, nginx)
+#   windows       — Windows Server 2022 (PowerShell, Administrator, IIS/WinRM)
+#
+# role options: web, app, db, bastion, monitoring, etc.
+#
+# Each entry can optionally override:
+#   environment   — overrides default root-level environment
+#   spot_price    — overrides default spot price; "" for on-demand
+
+servers = [
+  # ── Web tier: Amazon Linux ──────────────────────────────────────────────
+  {
+    name          = "web-server"
+    os_type       = "amazon_linux"
+    instance_type = "t3.medium"
+    count         = 2
+    volume_size   = 30
+    role          = "web"
+  },
+
+  # ── App tier: Ubuntu ────────────────────────────────────────────────────
+  {
+    name          = "app-server"
+    os_type       = "ubuntu"
+    instance_type = "t3.medium"
+    count         = 2
+    volume_size   = 50
+    role          = "app"
+  },
+
+  # ── Database tier: RedHat (RHEL 9) ──────────────────────────────────────
+  {
+    name          = "db-server"
+    os_type       = "redhat"
+    instance_type = "t3.large"
+    count         = 1
+    volume_size   = 100
+    role          = "db"
+  },
+
+  # ── Bastion host: Ubuntu ────────────────────────────────────────────────
+  {
+    name          = "bastion-host"
+    os_type       = "ubuntu"
+    instance_type = "t3.micro"
+    count         = 1
+    volume_size   = 20
+    role          = "bastion"
+  },
+
+  # ── Windows app server ──────────────────────────────────────────────────
+  {
+    name          = "windows-app"
+    os_type       = "windows"
+    instance_type = "t3.large"
+    count         = 1
+    volume_size   = 100
+    role          = "app"
+    environment   = "staging"     # Example: override environment
+    spot_price    = ""            # On-demand (no spot for Windows in this example)
+  },
+]
+
+# ssh_public_key is injected via GitHub Secret TF_VAR_ssh_public_key — do NOT put it here

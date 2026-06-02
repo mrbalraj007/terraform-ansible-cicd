@@ -1,21 +1,64 @@
----
-- name: Configure All Instances
-  hosts: all
+# ══════════════════════════════════════════════════════════════════════════════
+# site.yml — Enterprise Multi-OS Orchestrator
+#
+# This master playbook routes to OS-specific playbooks based on the
+# host groups discovered by the AWS EC2 dynamic inventory plugin.
+# Each play targets a specific OS group and applies common roles first,
+# then runs the OS-specific playbook for application configuration.
+#
+# Inventory groups are auto-populated from EC2 tags (set by Terraform):
+#   tag_OS_Type_amazon_linux  → Configure as Amazon Linux
+#   tag_OS_Type_ubuntu        → Configure as Ubuntu
+#   tag_OS_Type_redhat        → Configure as Red Hat Enterprise Linux
+#   tag_OS_Type_windows       → Configure as Windows Server
+#
+# Usage:
+#   ansible-playbook -i aws_ec2.yml playbooks/site.yml
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ──── Amazon Linux ──────────────────────────────────────────────────────────
+- name: "Configure Amazon Linux Instances"
+  hosts: tag_OS_Type_amazon_linux
   become: true
   gather_facts: true
   roles:
     - common
+  post_tasks:
+    - name: "Notify — Amazon Linux configuration complete"
+      ansible.builtin.debug:
+        msg: "Amazon Linux instance {{ inventory_hostname }} configured successfully."
 
-- name: Configure Web Servers
-  hosts: tag_Role_web
+# ──── Ubuntu ────────────────────────────────────────────────────────────────
+- name: "Configure Ubuntu Instances"
+  hosts: tag_OS_Type_ubuntu
   become: true
   gather_facts: true
   roles:
-    - webserver
+    - common
+  post_tasks:
+    - name: "Notify — Ubuntu configuration complete"
+      ansible.builtin.debug:
+        msg: "Ubuntu instance {{ inventory_hostname }} configured successfully."
 
-- name: Configure App Servers
-  hosts: tag_Role_app
+# ──── Red Hat Enterprise Linux ──────────────────────────────────────────────
+- name: "Configure RedHat Instances"
+  hosts: tag_OS_Type_redhat
   become: true
   gather_facts: true
   roles:
-    - webserver
+    - common
+  post_tasks:
+    - name: "Notify — RedHat configuration complete"
+      ansible.builtin.debug:
+        msg: "RedHat instance {{ inventory_hostname }} configured successfully."
+
+# ──── Windows Server ────────────────────────────────────────────────────────
+- name: "Configure Windows Instances"
+  hosts: tag_OS_Type_windows
+  gather_facts: true
+  roles:
+    - windows_common
+  post_tasks:
+    - name: "Notify — Windows configuration complete"
+      ansible.builtin.debug:
+        msg: "Windows instance {{ inventory_hostname }} configured successfully."

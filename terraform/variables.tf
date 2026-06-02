@@ -1,5 +1,10 @@
+###############################################################################
+# terraform/variables.tf
+# Root-level variables — user configures these via terraform.tfvars
+###############################################################################
+
 variable "aws_region" {
-  description = "AWS region"
+  description = "AWS region to deploy resources into"
   type        = string
   default     = "ap-southeast-2"
 }
@@ -11,43 +16,31 @@ variable "project_name" {
 }
 
 variable "environment" {
-  description = "Environment (dev / staging / prod)"
+  description = "Deployment environment (dev, staging, prod)"
   type        = string
   default     = "dev"
 }
 
-variable "instance_type" {
-  description = "EC2 instance type"
-  type        = string
-  default     = "t3.micro"
-}
-
-variable "web_instance_count" {
-  description = "Number of web-tier EC2 instances"
-  type        = number
-  default     = 1
-}
-
-variable "app_instance_count" {
-  description = "Number of app-tier EC2 instances"
-  type        = number
-  default     = 1
-}
-
 variable "ssh_public_key" {
-  description = "SSH public key content — stored as GitHub Secret SSH_PUBLIC_KEY"
+  description = "SSH public key content — injected via GitHub Secret TF_VAR_ssh_public_key"
   type        = string
   sensitive   = true
 }
 
 variable "allowed_ssh_cidr" {
-  description = "CIDR blocks allowed for SSH (GitHub-hosted runner IPs or 0.0.0.0/0 for simplicity)"
+  description = "CIDR blocks allowed for SSH (Linux) / RDP (Windows) access"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "allowed_http_cidr" {
+  description = "CIDR blocks allowed for HTTP/HTTPS access"
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
 
 variable "spot_max_price" {
-  description = "Maximum spot price (empty string = on-demand price). Set to \"0.016\" for t3.micro spot."
+  description = "Maximum spot price for all instances. Empty string = on-demand pricing. Set to \"0.016\" for t3.micro spot."
   type        = string
   default     = ""
 }
@@ -59,4 +52,71 @@ variable "common_tags" {
     ManagedBy = "Terraform"
     Owner     = "DevOps"
   }
+}
+
+variable "enable_volume_encryption" {
+  description = "Enable EBS volume encryption for all instances"
+  type        = bool
+  default     = true
+}
+
+# ──── Server Definitions (THE core variable) ────────────────────────────────
+# Users define their servers as a list of objects in terraform.tfvars:
+#
+# servers = [
+#   {
+#     name          = "web-server"
+#     os_type       = "amazon_linux"
+#     instance_type = "t3.medium"
+#     count         = 2
+#     volume_size   = 30
+#     role          = "web"
+#     environment   = "dev"           # optional, defaults to var.environment
+#   },
+#   {
+#     name          = "app-server"
+#     os_type       = "ubuntu"
+#     instance_type = "t3.medium"
+#     count         = 1
+#     volume_size   = 50
+#     role          = "app"
+#   },
+# ]
+#
+# os_type must be one of: amazon_linux, ubuntu, redhat, windows
+
+variable "servers" {
+  description = <<-EOT
+    List of server group definitions. Each entry specifies an OS type, count,
+    instance type, and role. The module creates that many EC2 instances
+    with appropriate security groups, tags, and Ansible inventory metadata.
+  EOT
+  type = list(object({
+    name          = string
+    os_type       = string
+    instance_type = optional(string, "t3.micro")
+    count         = optional(number, 1)
+    volume_size   = optional(number, 30)
+    role          = optional(string, "app")
+    environment   = optional(string, "") # falls back to var.environment
+    spot_price    = optional(string, "") # falls back to var.spot_max_price
+  }))
+
+  validation {
+    condition = alltrue([
+      for s in var.servers : contains(["amazon_linux", "ubuntu", "redhat", "windows"], s.os_type)
+    ])
+    error_message = "Each server's os_type must be one of: amazon_linux, ubuntu, redhat, windows."
+  }
+
+  default = [
+    {
+      name          = "default-web"
+      os_type       = "amazon_linux"
+      instance_type = "t3.micro"
+      count         = 1
+      volume_size   = 30
+      role          = "web"
+    }
+  ]
 }
