@@ -73,6 +73,7 @@ jobs:
           sleep 180
 
       - name: Test dynamic inventory — list all groups
+        id: inventory-check
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
           echo "### Dynamic Inventory Groups" >> $GITHUB_STEP_SUMMARY
@@ -84,30 +85,18 @@ jobs:
           ansible-inventory -i aws_ec2.yml --graph
           echo "───────────────────────────────────"
           echo "Host details:"
-          ansible-inventory -i aws_ec2.yml --list | python3 -c "
-import json, sys
-inv = json.load(sys.stdin)
-hosts = inv.get('_meta', {}).get('hostvars', {})
-groups = {k: v for k, v in inv.items() if k != '_meta'}
-print('Groups:', list(groups.keys()))
-for h, v in hosts.items():
-    tags = v.get('tags', {})
-    print(f'  {h}  OS={tags.get(\"OS_Type\",\"?\")}  Role={tags.get(\"Role\",\"?\")}  Env={tags.get(\"Environment\",\"?\")}')
-"
+          ansible-inventory -i aws_ec2.yml --list | ../scripts/inventory-host-details.py
+
+      - name: Save inventory JSON for later steps
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json
 
       - name: Test SSH connectivity (Linux hosts)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
-          # Test connectivity to Linux hosts (Amazon Linux, Ubuntu, RedHat)
           for group in tag_OS_Type_amazon_linux tag_OS_Type_ubuntu tag_OS_Type_redhat; do
-            if ansible-inventory -i aws_ec2.yml --list | python3 -c "
-import json, sys
-inv = json.load(sys.stdin)
-if '$group' in inv and inv['$group'].get('hosts'):
-    sys.exit(0)
-else:
-    sys.exit(1)
-"; then
+            if cat /tmp/ansible-inventory.json | ../scripts/check-inventory-group.py "$group"; then
               echo "Testing SSH to group: $group"
               ansible "$group" -i aws_ec2.yml -m ping --private-key ~/.ssh/deployer_key || true
             else
@@ -118,16 +107,12 @@ else:
       - name: Test WinRM connectivity (Windows hosts)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
-          if ansible-inventory -i aws_ec2.yml --list | python3 -c "
-import json, sys
-inv = json.load(sys.stdin)
-if 'tag_OS_Type_windows' in inv and inv['tag_OS_Type_windows'].get('hosts'):
-    sys.exit(0)
-else:
-    sys.exit(1)
-"; then
+          if cat /tmp/ansible-inventory.json | ../scripts/check-inventory-group.py tag_OS_Type_windows; then
             echo "Testing WinRM to Windows instances..."
-            ansible tag_OS_Type_windows -i aws_ec2.yml -m ansible.windows.win_ping || echo "WinRM test completed (may fail if WinRM not configured)"
+            ansible tag_OS_Type_windows \
+              -i aws_ec2.yml \
+              -m ansible.windows.win_ping \
+              || echo "WinRM test completed (may fail if WinRM not fully configured)"
           else
             echo "No Windows hosts found (skipping WinRM test)"
           fi
@@ -152,20 +137,12 @@ else:
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         if: always()
         run: |
-          # Check Linux web servers (SSH-based)
           for group in tag_Role_web tag_Role_app; do
-            if ansible-inventory -i aws_ec2.yml --list | python3 -c "
-import json, sys
-inv = json.load(sys.stdin)
-if '$group' in inv and inv['$group'].get('hosts'):
-    sys.exit(0)
-sys.exit(1)
-"; then
+            if cat /tmp/ansible-inventory.json | ../scripts/check-inventory-group.py "$group"; then
               echo "Checking HTTP on group: $group"
               ansible "$group" -i aws_ec2.yml \
                 --private-key ~/.ssh/deployer_key \
                 -m uri -a "url=http://{{ ansible_host }} return_content=yes" \
-                -u "{{ hostvars[inventory_hostname].ansible_user | default('ec2-user') }}" \
                 2>&1 || echo "Note: some hosts may not be web servers"
             fi
           done
@@ -175,18 +152,7 @@ sys.exit(1)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
           echo "### Ansible Run Summary (Multi-OS)" >> $GITHUB_STEP_SUMMARY
-          echo '| OS Type | Host | Public IP | Ansible Reachable |' >> $GITHUB_STEP_SUMMARY
-          echo '|---------|------|-----------|-------------------|' >> $GITHUB_STEP_SUMMARY
-          ansible-inventory -i aws_ec2.yml --list | python3 -c "
-import json, sys
-inv = json.load(sys.stdin)
-hosts = inv.get('_meta', {}).get('hostvars', {})
-for h, v in hosts.items():
-    tags = v.get('tags', {})
-    os_type = tags.get('OS_Type', '?')
-    ip = v.get('public_ip_address', 'N/A')
-    print(f'| {os_type} | {h} | {ip} | ✅ |')
-" >> "$GITHUB_STEP_SUMMARY"
+          ansible-inventory -i aws_ec2.yml --list | ../scripts/inventory-summary-table.py >> "$GITHUB_STEP_SUMMARY"
 
       - name: Cleanup SSH key
         if: always()
