@@ -81,7 +81,7 @@ jobs:
             echo "### Server Inventory" >> $GITHUB_STEP_SUMMARY
             echo '| # | Name | OS Type | Instance Type | Count | Role |' >> $GITHUB_STEP_SUMMARY
             echo '|---|------|---------|---------------|-------|------|' >> $GITHUB_STEP_SUMMARY
-            ../scripts/parse-servers-to-summary.py >> $GITHUB_STEP_SUMMARY
+            python3 ../scripts/parse-servers-to-summary.py >> $GITHUB_STEP_SUMMARY
           else
             echo "has_servers=false" >> $GITHUB_OUTPUT
             echo "server_count=0" >> $GITHUB_OUTPUT
@@ -153,7 +153,7 @@ jobs:
           terraform output -json > ../terraform-outputs.json
           echo "### Provisioned Infrastructure" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          ../scripts/outputs-to-summary.py < ../terraform-outputs.json >> $GITHUB_STEP_SUMMARY
+          python3 ../scripts/outputs-to-summary.py < ../terraform-outputs.json >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           cat ../terraform-outputs.json
 
@@ -167,7 +167,7 @@ jobs:
       - name: Generate Ansible inventory metadata
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          terraform output -json | ../scripts/generate-ansible-host-map.py
+          terraform output -json | python3 ../scripts/generate-ansible-host-map.py
 
   # ==========================================================================
   # Job 3: Destroy (manual only)
