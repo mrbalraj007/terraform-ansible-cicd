@@ -8,7 +8,7 @@
 aws_region     = "us-east-1"
 project_name   = "tf-ansible-demo"
 environment    = "dev"
-spot_max_price = "0.0185"
+spot_max_price = "0.0203"
 
 # ──── Server Definitions ────────────────────────────────────────────────────
 # os_type options: amazon_linux, ubuntu, redhat, windows
