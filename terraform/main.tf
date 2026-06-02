@@ -44,6 +44,18 @@ data "aws_subnets" "default" {
   }
 }
 
+# ──── Locals ─────────────────────────────────────────────────────────────────
+
+locals {
+  # Base64-encoded Windows user_data script that configures WinRM for Ansible
+  windows_userdata_b64 = base64encode(<<-EOWIN
+<powershell>
+${file("../scripts/configure-winrm.ps1")}
+</powershell>
+EOWIN
+  )
+}
+
 # ──── EC2 Instance Groups (one module call per server definition) ───────────
 # Each entry in var.servers creates a group of EC2 instances with matching
 # OS, security group, tags, and optional spot pricing.
@@ -73,4 +85,7 @@ module "server_group" {
   allowed_ssh_cidr         = var.allowed_ssh_cidr
   allowed_http_cidr        = var.allowed_http_cidr
   enable_volume_encryption = var.enable_volume_encryption
+
+  # Pass the WinRM bootstrap script only to Windows instances
+  user_data_script = each.value.os_type == "windows" ? local.windows_userdata_b64 : ""
 }
