@@ -11,7 +11,7 @@ OUTPUT_DIR="./keys"
 
 mkdir -p "$OUTPUT_DIR"
 
-ssh-keygen -t ed25519 -f "$OUTPUT_DIR/$KEY_NAME" -N "" -C "github-actions-deployer"
+ssh-keygen -t rsa -b 4096 -f "$OUTPUT_DIR/$KEY_NAME" -N "" -C "github-actions-deployer"
 
 echo ""
 echo "══════════════════════════════════════════════════"
