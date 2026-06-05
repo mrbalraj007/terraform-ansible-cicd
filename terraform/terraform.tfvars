@@ -30,7 +30,7 @@ servers = [
     os_type       = "amazon_linux"
     instance_type = "t3.micro"
     count         = 1
-    volume_size   = 30
+    volume_size   = 10
     role          = "web"
   },
   {
@@ -38,7 +38,7 @@ servers = [
     os_type       = "amazon_linux"
     instance_type = "t3.micro"
     count         = 1
-    volume_size   = 30
+    volume_size   = 10
     role          = "app"
   },
   {
