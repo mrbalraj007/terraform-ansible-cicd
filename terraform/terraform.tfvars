@@ -35,7 +35,7 @@ servers = [
   },
   {
     name          = "app-server"
-    os_type       = "amazon_linux"
+    os_type       = "ubuntu"
     instance_type = "t3.micro"
     count         = 1
     volume_size   = 30

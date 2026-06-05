@@ -6,11 +6,13 @@
 enable_monitoring: "{{ 'true' if tags.Environment == 'prod' else 'false' }}"
 
 # Common packages (OS-specific roles handle installation)
+# NOTE: Do NOT include curl here — Amazon Linux 2023 ships curl-minimal
+# which conflicts if 'curl' is explicitly requested. The common role handles
+# this by dynamically selecting curl vs curl-minimal per OS.
 common_packages:
   - wget
   - unzip
   - git
-  - curl
 
 # Deployment metadata
 deployment_tool: "Terraform + Ansible"
