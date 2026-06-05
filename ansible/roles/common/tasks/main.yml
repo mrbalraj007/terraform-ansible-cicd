@@ -39,11 +39,9 @@
 
 - name: "Install common utilities (RedHat/Amazon Linux)"
   ansible.builtin.dnf:
-    name: "{{ common_packages | default(['wget', 'unzip', 'git', 'curl']) }}"
+    name: "{{ common_packages | default(['wget', 'unzip', 'git']) + (['curl-minimal'] if ansible_distribution == 'Amazon' and ansible_distribution_major_version | int >= 2023 else ['curl']) }}"
     state: present
   when: ansible_os_family == "RedHat"
-  # NOTE: curl maps to curl-minimal on Amazon Linux 2023 — the dnf
-  # resolver handles the conflict automatically.
 
 # ── Timezone ────────────────────────────────────────────────────────────────
 - name: "Set timezone to UTC"
