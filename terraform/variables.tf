@@ -21,10 +21,10 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key content — injected via GitHub Secret TF_VAR_ssh_public_key"
+variable "key_name" {
+  description = "Name of an existing EC2 key pair in AWS (e.g. MYLABKEY). The private key for this key pair must be stored as the SSH_PRIVATE_KEY GitHub secret for Ansible connectivity."
   type        = string
-  sensitive   = true
+  default     = "MYLABKEY"
 }
 
 variable "allowed_ssh_cidr" {
