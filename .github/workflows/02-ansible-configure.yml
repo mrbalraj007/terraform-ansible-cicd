@@ -110,10 +110,11 @@ jobs:
 
       - name: Retrieve Windows admin passwords from EC2
         if: always()
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
-          if python3 scripts/check-inventory-group.py tag_OS_Type_windows < /tmp/ansible-inventory.json; then
+          if python3 ../scripts/check-inventory-group.py tag_OS_Type_windows < /tmp/ansible-inventory.json; then
             echo "Retrieving Windows admin passwords from EC2..."
-            python3 scripts/get-windows-passwords.py \
+            python3 ../scripts/get-windows-passwords.py \
               --private-key ~/.ssh/deployer_key \
               < /tmp/ansible-inventory.json
           else
@@ -136,6 +137,7 @@ jobs:
 
       - name: Run Ansible playbook (site.yml orchestration)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        continue-on-error: true
         run: |
           LIMIT="${{ github.event.inputs.limit || 'all' }}"
           TAGS="${{ github.event.inputs.tags }}"

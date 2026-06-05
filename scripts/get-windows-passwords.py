@@ -19,11 +19,19 @@ import sys
 import tempfile
 
 
+def _unwrap(val):
+    """Unwrap __ansible_unsafe dict values and return the inner string."""
+    if isinstance(val, dict) and "__ansible_unsafe" in val:
+        return val["__ansible_unsafe"]
+    return val
+
+
 def get_instance_id(inventory, ip):
     """Find the EC2 instance ID for a given IP from the inventory _meta."""
     meta = inventory.get("_meta", {}).get("hostvars", {})
     if ip in meta:
-        return meta[ip].get("ec2_id") or meta[ip].get("instance_id", "")
+        raw = meta[ip].get("ec2_id") or meta[ip].get("instance_id", "")
+        return _unwrap(raw) if raw else ""
     return ""
 
 
