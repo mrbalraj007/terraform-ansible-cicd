@@ -46,7 +46,7 @@
     type: dword
 
 - name: "Allow RDP in Windows Firewall"
-  ansible.windows.win_firewall_rule:
+  community.windows.win_firewall_rule:
     name: RDP-TCP-In
     localport: 3389
     action: allow
