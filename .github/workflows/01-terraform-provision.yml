@@ -79,8 +79,8 @@ jobs:
             COUNT=$(grep -c "os_type" terraform.tfvars || true)
             echo "server_count=$COUNT" >> $GITHUB_OUTPUT
             echo "### Server Inventory" >> $GITHUB_STEP_SUMMARY
-            echo '| # | Name | OS Type | Instance Type | Count | Role |' >> $GITHUB_STEP_SUMMARY
-            echo '|---|------|---------|---------------|-------|------|' >> $GITHUB_STEP_SUMMARY
+            echo '| # | Name | OS Type | Instance Type | Count | Volume Size | Role |' >> $GITHUB_STEP_SUMMARY
+            echo '|---|------|---------|---------------|-------|-------------|------|' >> $GITHUB_STEP_SUMMARY
             python3 ../scripts/parse-servers-to-summary.py >> $GITHUB_STEP_SUMMARY
           else
             echo "has_servers=false" >> $GITHUB_OUTPUT
