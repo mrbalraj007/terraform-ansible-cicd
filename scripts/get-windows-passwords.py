@@ -38,6 +38,7 @@ def get_instance_id(inventory, ip):
 def get_password(instance_id, pem_file):
     """Retrieve and decrypt the Windows admin password for an EC2 instance."""
     try:
+        # First attempt: decrypt with private key
         cmd = [
             "aws", "ec2", "get-password-data",
             "--instance-id", instance_id,
@@ -46,12 +47,28 @@ def get_password(instance_id, pem_file):
             "--output", "text",
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode != 0:
-            print(f"  WARNING: Failed to get password for {instance_id}: {result.stderr.strip()}", file=sys.stderr)
-            return None
-        password = result.stdout.strip()
-        if password and password != "None" and not password.startswith("None"):
-            return password
+        if result.returncode == 0:
+            password = result.stdout.strip()
+            if password and password != "None" and not password.startswith("None"):
+                return password
+
+        # Second attempt: get the encrypted password data (no key decryption)
+        # AWS may return the raw encrypted password; we log it for debugging
+        print(f"  Key-based decryption failed for {instance_id}: {result.stderr.strip()}", file=sys.stderr)
+        print(f"  Trying to retrieve encrypted password data without key...", file=sys.stderr)
+
+        cmd = [
+            "aws", "ec2", "get-password-data",
+            "--instance-id", instance_id,
+            "--query", "PasswordData",
+            "--output", "text",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            encrypted = result.stdout.strip()
+            if encrypted and encrypted != "None" and not encrypted.startswith("None"):
+                print(f"  NOTE: Encrypted password retrieved but cannot decrypt without the matching private key.", file=sys.stderr)
+                print(f"  HINT: Ensure the SSH_PRIVATE_KEY secret matches the public key used in TF_VAR_ssh_public_key.", file=sys.stderr)
         return None
     except Exception as e:
         print(f"  WARNING: Error for {instance_id}: {e}", file=sys.stderr)

@@ -39,8 +39,13 @@
 
 - name: "Install common utilities (RedHat/Amazon Linux)"
   ansible.builtin.dnf:
-    name: "{{ common_packages | default(['wget', 'unzip', 'git']) + (['curl-minimal'] if ansible_distribution == 'Amazon' and ansible_distribution_major_version | int >= 2023 else ['curl']) }}"
+    name: >-
+      {{ (common_packages | default(['wget', 'unzip', 'git'])) +
+         (['curl-minimal'] if ansible_distribution == 'Amazon' and ansible_distribution_major_version | int >= 2023 else ['curl']) }}
     state: present
+    # On Amazon Linux 2023, avoid the curl <-> curl-minimal package conflict
+    # by using --allowerasing to swap curl for curl-minimal when necessary.
+    allowerasing: "{{ true if ansible_distribution == 'Amazon' and ansible_distribution_major_version | int >= 2023 else false }}"
   when: ansible_os_family == "RedHat"
 
 # ── Timezone ────────────────────────────────────────────────────────────────
