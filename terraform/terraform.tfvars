@@ -44,4 +44,5 @@ servers = [
  
 ]
 
-# ssh_public_key is injected via GitHub Secret TF_VAR_ssh_public_key — do NOT put it here
+# key_name is the name of an existing EC2 key pair in your AWS account (MYLABKEY)
+# The private key for this pair must be stored as SSH_PRIVATE_KEY in GitHub Secrets.
