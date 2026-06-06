@@ -25,6 +25,12 @@ ansible/group_vars/all/vault.yml
 .DS_Store
 Thumbs.db
 
+# Kimchi
+../.kimchi/
+../.kimchi/*
+./.kimchi/*
+/.kimchi/*
+
 
 # Txt files
 .txt

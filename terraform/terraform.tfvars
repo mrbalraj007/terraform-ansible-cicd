@@ -41,7 +41,14 @@ servers = [
     volume_size   = 30
     role          = "app"
   },
-
+  {
+    name          = "win-server"
+    os_type       = "windows"
+    instance_type = "t3.micro"
+    count         = 1
+    volume_size   = 30
+    role          = "app"
+  },
 ]
 
 # ssh_public_key is injected via GitHub Secret TF_VAR_ssh_public_key — do NOT put it here
