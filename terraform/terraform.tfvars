@@ -41,7 +41,7 @@ servers = [
     volume_size   = 30
     role          = "app"
   },
- 
+
 ]
 
 # ssh_public_key is injected via GitHub Secret TF_VAR_ssh_public_key — do NOT put it here
