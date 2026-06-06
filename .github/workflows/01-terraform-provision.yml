@@ -200,3 +200,13 @@ jobs:
           terraform destroy \
             -var-file="terraform.tfvars" \
             -auto-approve
+
+      - name: Clear Terraform state to force fresh resource creation
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "Removing all resources from state after destroy..."
+          for resource in $(terraform state list 2>/dev/null || true); do
+            echo "Removing from state: $resource"
+            terraform state rm "$resource" 2>/dev/null || true
+          done
+          echo "State cleared. Next apply will create fresh resources with correct key pair."
