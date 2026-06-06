@@ -20,6 +20,9 @@ on:
         default: "plan"
         type: choice
         options: [plan, apply, destroy]
+      ssh_public_key:
+        description: "SSH public key content (from scripts/keys/deployer_key.pub)"
+        required: true
 
 env:
   TF_VERSION: "latest"
@@ -91,7 +94,7 @@ jobs:
         id: plan
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY || github.event.inputs.ssh_public_key }}
         run: |
           terraform plan \
             -var-file="terraform.tfvars" \
@@ -146,7 +149,7 @@ jobs:
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY || github.event.inputs.ssh_public_key }}
         run: terraform apply -auto-approve tfplan
 
       - name: Save Terraform outputs
