@@ -41,7 +41,14 @@ servers = [
     volume_size   = 30
     role          = "app"
   },
-
+  {
+    name          = "win-server"
+    os_type       = "windows"
+    instance_type = "t3.micro"
+    count         = 1
+    volume_size   = 30
+    role          = "app"
+  },
 ]
 
 # key_name is the name of an existing EC2 key pair in your AWS account (MYLABKEY)
