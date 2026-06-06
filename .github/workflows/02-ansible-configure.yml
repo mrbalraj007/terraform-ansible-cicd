@@ -7,6 +7,8 @@ on:
         required: true
       SSH_PRIVATE_KEY:
         required: true
+      SSH_PUBLIC_KEY:
+        required: false
 
   # Triggered automatically after Terraform Apply succeeds
   workflow_run:
@@ -73,7 +75,7 @@ jobs:
           echo "Waiting for EC2 instances to fully initialize..."
           echo "  Linux instances: ~60s for SSH"
           echo "  Windows instances: ~180s for WinRM"
-          sleep 180
+          sleep 120
 
       - name: Save inventory JSON (used by subsequent steps)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
