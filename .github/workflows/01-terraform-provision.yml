@@ -5,6 +5,8 @@ on:
     secrets:
       AWS_IAM_ROLE_ARN:
         required: true
+      SSH_PUBLIC_KEY:
+        required: true
 
   push:
     branches: [main]
@@ -88,6 +90,8 @@ jobs:
       - name: Terraform Plan
         id: plan
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
         run: |
           terraform plan \
             -var-file="terraform.tfvars" \
