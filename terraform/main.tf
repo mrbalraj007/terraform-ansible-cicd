@@ -55,17 +55,21 @@ ${file("../scripts/configure-winrm.ps1")}
 EOWIN
   )
 
-  # Key pair name — uses an EXISTING key pair in AWS (e.g. MYLABKEY)
-  # The matching private key must be stored as SSH_PRIVATE_KEY in GitHub Secrets
-  # for Ansible to connect to the instances.
-  key_name = var.key_name
+  # Key pair name derived from project and environment
+  key_pair_name = "${var.project_name}-${var.environment}-deployer-key"
 }
 
-# ──── Existing Key Pair Data Source ─────────────────────────────────────────
-# Look up the already-existing key pair by name. Terraform does NOT create or
-# manage this key pair — it only references the one you already have in AWS.
-data "aws_key_pair" "existing" {
-  key_name = local.key_name
+# ──── Key Pair (created by Terraform — public key from GitHub Secret) ─────
+# Creates an AWS key pair using the public key content passed via TF_VAR_ssh_public_key.
+# The private key is stored in GitHub Secrets (SSH_PRIVATE_KEY) and used by Ansible.
+resource "aws_key_pair" "deployer" {
+  key_name   = local.key_pair_name
+  public_key = var.ssh_public_key
+
+  tags = merge(var.common_tags, {
+    Environment = var.environment
+    Project     = var.project_name
+  })
 }
 
 # ──── EC2 Instance Groups (one module call per server definition) ───────────
@@ -90,7 +94,7 @@ module "server_group" {
   environment              = each.value.environment != "" ? each.value.environment : var.environment
   vpc_id                   = data.aws_vpc.default.id
   subnet_ids               = data.aws_subnets.default.ids
-  key_name                 = local.key_name
+  key_name                 = aws_key_pair.deployer.key_name
   spot_max_price           = each.value.spot_price != "" ? each.value.spot_price : var.spot_max_price
   project_name             = var.project_name
   common_tags              = var.common_tags

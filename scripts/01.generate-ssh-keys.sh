@@ -2,30 +2,26 @@
 # ──────────────────────────────────────────────────────────────
 # generate-ssh-keys.sh
 # Run this ONCE locally to generate the SSH key pair.
-# Then upload the public key to AWS EC2 as a key pair named
-# "MYLABKEY" (or your preferred name), and add the private key
-# as a GitHub Secret.
+# The public key content is stored in GitHub Secret SSH_PUBLIC_KEY,
+# and Terraform uses it to create the AWS key pair automatically.
+# The private key is stored in GitHub Secret SSH_PRIVATE_KEY
+# for Ansible to SSH into the EC2 instances.
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
-KEY_NAME="MYLABKEY2026"
+KEY_NAME="deployer_key"
 OUTPUT_DIR="./keys"
 
 echo "══════════════════════════════════════════════════"
 echo " This script generates a new SSH key pair."
 echo " You must then:"
 echo ""
-echo "  1. Import the public key into AWS EC2:"
-echo "     aws ec2 import-key-pair \\"
-echo "       --key-name \"$KEY_NAME\" \\"
-echo "       --public-key-material \"fileb://$OUTPUT_DIR/${KEY_NAME}.pub\""
-echo "       # Or via the AWS Console: EC2 → Key Pairs → Import"
-echo ""
-echo "  2. Add the private key as a GitHub Secret:"
+echo "  1. Add both keys as GitHub Secrets (script does this automatically):"
 echo "     SSH_PRIVATE_KEY  →  Contents of: $OUTPUT_DIR/$KEY_NAME"
+echo "     SSH_PUBLIC_KEY   →  Contents of: $OUTPUT_DIR/${KEY_NAME}.pub"
 echo ""
-echo "  ⚠️  SSH_PUBLIC_KEY is NO LONGER needed as a GitHub Secret."
-echo "     Terraform now references the existing key pair by name."
+echo "  2. Terraform will create the AWS key pair automatically"
+echo "     from the SSH_PUBLIC_KEY secret when you run the pipeline."
 echo "══════════════════════════════════════════════════"
 echo ""
 
