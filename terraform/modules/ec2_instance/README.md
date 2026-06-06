@@ -57,4 +57,3 @@ See `variables.tf` for the full list.
 - `admin_user` — Default admin username for the OS
 - `os_type` — OS type identifier
 - `security_group_id` — Security group ID
-- `eip_addresses` — Elastic IPs (Windows only)

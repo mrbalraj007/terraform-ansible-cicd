@@ -22,7 +22,7 @@ variable "environment" {
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key content — injected via GitHub Secret TF_VAR_ssh_public_key"
+  description = "SSH public key content — injected via GitHub Secret TF_VAR_ssh_public_key, used to create the AWS key pair"
   type        = string
   sensitive   = true
 }

@@ -2,12 +2,28 @@
 # ──────────────────────────────────────────────────────────────
 # generate-ssh-keys.sh
 # Run this ONCE locally to generate the SSH key pair.
-# Then add the keys as GitHub Secrets.
+# The public key content is stored in GitHub Secret SSH_PUBLIC_KEY,
+# and Terraform uses it to create the AWS key pair automatically.
+# The private key is stored in GitHub Secret SSH_PRIVATE_KEY
+# for Ansible to SSH into the EC2 instances.
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
 
 KEY_NAME="deployer_key"
 OUTPUT_DIR="./keys"
+
+echo "══════════════════════════════════════════════════"
+echo " This script generates a new SSH key pair."
+echo " You must then:"
+echo ""
+echo "  1. Add both keys as GitHub Secrets (script does this automatically):"
+echo "     SSH_PRIVATE_KEY  →  Contents of: $OUTPUT_DIR/$KEY_NAME"
+echo "     SSH_PUBLIC_KEY   →  Contents of: $OUTPUT_DIR/${KEY_NAME}.pub"
+echo ""
+echo "  2. Terraform will create the AWS key pair automatically"
+echo "     from the SSH_PUBLIC_KEY secret when you run the pipeline."
+echo "══════════════════════════════════════════════════"
+echo ""
 
 mkdir -p "$OUTPUT_DIR"
 

@@ -55,11 +55,13 @@ ${file("../scripts/configure-winrm.ps1")}
 EOWIN
   )
 
-  # Key pair name used across all instances
+  # Key pair name derived from project and environment
   key_pair_name = "${var.project_name}-${var.environment}-deployer-key"
 }
 
-# ──── Shared Key Pair (created once, referenced by all instance groups) ─────
+# ──── Key Pair (created by Terraform — public key from GitHub Secret) ─────
+# Creates an AWS key pair using the public key content passed via TF_VAR_ssh_public_key.
+# The private key is stored in GitHub Secrets (SSH_PRIVATE_KEY) and used by Ansible.
 resource "aws_key_pair" "deployer" {
   key_name   = local.key_pair_name
   public_key = var.ssh_public_key

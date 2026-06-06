@@ -18,6 +18,9 @@ on:
         default: "plan"
         type: choice
         options: [plan, apply, destroy]
+      ssh_public_key:
+        description: "SSH public key content (from scripts/keys/deployer_key.pub)"
+        required: true
 
 env:
   TF_VERSION: "latest"
@@ -97,7 +100,7 @@ jobs:
         id: plan
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:
-          TF_VAR_ssh_public_key: ${{ steps.ssh-key.outputs.public_key }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY || github.event.inputs.ssh_public_key }}
         run: |
           terraform plan \
             -var-file="terraform.tfvars" \
@@ -151,6 +154,8 @@ jobs:
 
       - name: Terraform Apply
         working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY || github.event.inputs.ssh_public_key }}
         run: terraform apply -auto-approve tfplan
 
       - name: Save Terraform outputs
@@ -214,9 +219,17 @@ jobs:
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          TF_VAR_ssh_public_key: ${{ steps.ssh-key-destroy.outputs.public_key }}
         run: |
           terraform destroy \
             -var-file="terraform.tfvars" \
             -auto-approve
+
+      - name: Clear Terraform state to force fresh resource creation
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          echo "Removing all resources from state after destroy..."
+          for resource in $(terraform state list 2>/dev/null || true); do
+            echo "Removing from state: $resource"
+            terraform state rm "$resource" 2>/dev/null || true
+          done
+          echo "State cleared. Next apply will create fresh resources with correct key pair."
