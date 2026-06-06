@@ -14,7 +14,7 @@ terraform.tfvars (server list) → Terraform (EC2 + SG + tags) → Ansible (dyna
 
 - **Terraform** — Root module in `terraform/` iterates over `var.servers` using `for_each`, calling the reusable `terraform/modules/ec2_instance/` module per server group. AMI lookups are centralized in `amis.tf`.
 - **Ansible** — AWS EC2 dynamic inventory (`ansible/aws_ec2.yml`) discovers instances by tags. Playbooks are routed by OS type group (`tag_OS_Type_*`). The master orchestrator `ansible/playbooks/site.yml` delegates to OS-specific playbooks.
-- **GitHub Actions** — Three reusable workflows in `.github/workflows/`: Terraform provision (plan/apply/destroy), Ansible configure (multi-OS), and a combined full CI/CD pipeline. Secrets (`AWS_IAM_ROLE_ARN`, `SSH_PUBLIC_KEY`, `SSH_PRIVATE_KEY`) are managed at the repo level.
+- **GitHub Actions** — Three reusable workflows in `.github/workflows/`: Terraform provision (plan/apply/destroy), Ansible configure (multi-OS), and a combined full CI/CD pipeline. Secrets (`AWS_IAM_ROLE_ARN`) managed at the repo level. SSH keys are stored in `scripts/keys/` and read directly from the repo during CI runs.
 
 ## Commands
 

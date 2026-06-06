@@ -5,8 +5,6 @@ on:
     secrets:
       AWS_IAM_ROLE_ARN:
         required: true
-      SSH_PRIVATE_KEY:
-        required: true
 
   # Triggered automatically after Terraform Apply succeeds
   workflow_run:
@@ -63,10 +61,10 @@ jobs:
           pip install ansible boto3 botocore pywinrm
           ansible-galaxy collection install -r requirements.yml
 
-      - name: Write SSH private key
+      - name: Write SSH private key from repo
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deployer_key
+          cp scripts/keys/deployer_key ~/.ssh/deployer_key
           chmod 600 ~/.ssh/deployer_key
 
       - name: Save inventory JSON (used by polling & subsequent steps)
