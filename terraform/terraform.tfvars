@@ -41,7 +41,7 @@ servers = [
     volume_size   = 30
     role          = "app"
   },
- 
+
 ]
 
 # key_name is the name of an existing EC2 key pair in your AWS account (MYLABKEY)
