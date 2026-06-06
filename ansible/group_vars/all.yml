@@ -3,7 +3,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Monitoring
-enable_monitoring: "{{ 'true' if tags.Environment == 'prod' else 'false' }}"
+enable_monitoring: "{{ 'true' if (vars['tags'] | default({})).Environment == 'prod' else 'false' }}"
 
 # Common packages (OS-specific roles handle installation)
 # NOTE: Do NOT include curl here — Amazon Linux 2023 ships curl-minimal
