@@ -143,7 +143,7 @@ Edit `terraform/terraform.tfvars` to match your environment:
 ```hcl
 aws_region        = "us-east-1"         # Change if needed
 allowed_ssh_cidr  = ["YOUR_IP/32"]      # Restrict SSH to your IP
-ssh_public_key    = ""                  # Leave empty; comes from GitHub Secret
+ssh_public_key    = ""                  # Leave empty; injected from SSH_PUBLIC_KEY secret
 ```
 
 ---
@@ -154,23 +154,34 @@ ssh_public_key    = ""                  # Leave empty; comes from GitHub Secret
 
 Push to `main` branch and the CI/CD pipeline runs automatically via the configured workflows.
 
+**Key flow (fully automated):**
+1. **`01.generate-ssh-keys.sh`** generates keys locally and uploads to GitHub Secrets (`SSH_PUBLIC_KEY`, `SSH_PRIVATE_KEY`)
+2. **`01-terraform-provision.yml`** reads `SSH_PUBLIC_KEY` from repo secrets → sets `TF_VAR_ssh_public_key` → Terraform creates AWS key pair
+3. **`02-ansible-configure.yml`** reads `SSH_PRIVATE_KEY` from repo secrets → writes to `~/.ssh/deployer_key` → Ansible connects to EC2 instances
+
 ### Option B: Local Testing
 
 ```bash
-# 1. Initialize Terraform
+# 1. Export the SSH key from the repo secret (one-time)
+gh secret list --repo "$(gh repo view --json nameWithOwner -q '.nameWithOwner')"
+gh secret view SSH_PUBLIC_KEY --repo "$(gh repo view --json nameWithOwner -q '.nameWithOwner')" > ~/.ssh/deployer_key.pub
+gh secret view SSH_PRIVATE_KEY --repo "$(gh repo view --json nameWithOwner -q '.nameWithOwner')" > ~/.ssh/deployer_key
+chmod 600 ~/.ssh/deployer_key
+
+# 2. Initialize Terraform
 cd terraform
 terraform init
 
-# 2. Plan (replace placeholders appropriately)
+# 3. Plan
 terraform plan -var="ssh_public_key=$(cat ~/.ssh/deployer_key.pub)"
 
-# 3. Apply
+# 4. Apply
 terraform apply -auto-approve -var="ssh_public_key=$(cat ~/.ssh/deployer_key.pub)"
 
-# 4. Run Ansible
+# 5. Run Ansible
 cd ../ansible
 ansible-inventory -i aws_ec2.yml --graph
-ansible-playbook -i aws_ec2.yml playbooks/site.yml
+ansible-playbook -i aws_ec2.yml playbooks/site.yml --private-key ~/.ssh/deployer_key
 ```
 
 ---

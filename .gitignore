@@ -35,6 +35,7 @@ Thumbs.db
 # Txt files
 .txt
 *.txt
+terraform-ansible-cicd-guide.jsx.txt
 
 # Claud files
 .claud/

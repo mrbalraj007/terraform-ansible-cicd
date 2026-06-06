@@ -32,20 +32,20 @@
       when: not ansible_winrm_cert_present | default(false)
 
     # ── Windows Updates ───────────────────────────────────────────────────
-    - name: "Install all critical and security Windows Updates"
-      ansible.windows.win_updates:
-        category_names:
-          - CriticalUpdates
-          - SecurityUpdates
-          - UpdateRollups
-        state: installed
-        reboot: true
-        reboot_timeout: 600
-      register: win_updates_result
-
-    - name: "Display Windows Update result"
-      ansible.builtin.debug:
-        var: win_updates_result
+    # - name: "Install all critical and security Windows Updates"
+      # ansible.windows.win_updates:
+        # category_names:
+          # - CriticalUpdates
+          # - SecurityUpdates
+          # - UpdateRollups
+        # state: installed
+        # reboot: true
+        # reboot_timeout: 600
+      # register: win_updates_result
+# 
+    # - name: "Display Windows Update result"
+      # ansible.builtin.debug:
+        # var: win_updates_result
 
     # ── Chocolatey Package Manager ────────────────────────────────────────
     - name: "Install Chocolatey"
