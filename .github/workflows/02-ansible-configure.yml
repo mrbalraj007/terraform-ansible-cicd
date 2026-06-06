@@ -64,10 +64,10 @@ jobs:
           pip install ansible boto3 botocore pywinrm
           ansible-galaxy collection install -r requirements.yml
 
-      - name: Write SSH private key from repo
+      - name: Write SSH private key from repo secret
         run: |
           mkdir -p ~/.ssh
-          cp scripts/keys/deployer_key ~/.ssh/deployer_key
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deployer_key
           chmod 600 ~/.ssh/deployer_key
 
       - name: Wait for EC2 instances to be ready
