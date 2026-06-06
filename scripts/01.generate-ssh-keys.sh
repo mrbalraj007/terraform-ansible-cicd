@@ -38,22 +38,56 @@ echo "════════════════════════�
 echo " Keys generated in: $OUTPUT_DIR/"
 echo "══════════════════════════════════════════════════"
 echo ""
-echo "NEXT STEPS:"
-echo ""
-echo "  1. Import public key to AWS (EC2 → Key Pairs → Import):"
-echo "     aws ec2 import-key-pair \\"
-echo "       --key-name \"$KEY_NAME\" \\"
-echo "       --public-key-material \"fileb://$OUTPUT_DIR/${KEY_NAME}.pub\""
-echo ""
-echo "  2. Add this private key as GitHub Secret 'SSH_PRIVATE_KEY':"
-echo ""
-echo "Private key (copy everything including headers):"
+
+# ──────────────────────────────────────────────────────────────
+# Auto-upload keys as GitHub Secrets
+# ──────────────────────────────────────────────────────────────
 echo "──────────────────────────────────────────────────"
-cat "$OUTPUT_DIR/$KEY_NAME"
-echo ""
-echo "Public key (for AWS import):"
+echo " Uploading keys to GitHub Secrets..."
 echo "──────────────────────────────────────────────────"
-cat "$OUTPUT_DIR/${KEY_NAME}.pub"
+
+if ! command -v gh &> /dev/null; then
+    echo ""
+    echo "⚠️  gh CLI not found. Please install it:"
+    echo "   https://cli.github.com/"
+    echo ""
+    echo "Then manually add these as GitHub Secrets:"
+    echo ""
+    echo "  SSH_PRIVATE_KEY  →  Contents of: $OUTPUT_DIR/$KEY_NAME"
+    echo "  SSH_PUBLIC_KEY   →  Contents of: $OUTPUT_DIR/${KEY_NAME}.pub"
+    exit 0
+fi
+
+if ! gh auth status &> /dev/null; then
+    echo ""
+    echo "⚠️  gh CLI is not authenticated. Please run:"
+    echo "   gh auth login"
+    echo ""
+    echo "Then manually add these as GitHub Secrets:"
+    echo ""
+    echo "  SSH_PRIVATE_KEY  →  Contents of: $OUTPUT_DIR/$KEY_NAME"
+    echo "  SSH_PUBLIC_KEY   →  Contents of: $OUTPUT_DIR/${KEY_NAME}.pub"
+    exit 0
+fi
+
+REPO="$(gh repo view --json nameWithOwner -q '.nameWithOwner')"
+
 echo ""
+echo "Setting SSH_PRIVATE_KEY..."
+gh secret set SSH_PRIVATE_KEY --repo "${REPO:?}" --body "$(cat "$OUTPUT_DIR/$KEY_NAME")"
+
+echo ""
+echo "Setting SSH_PUBLIC_KEY..."
+gh secret set SSH_PUBLIC_KEY --repo "${REPO:?}" --body "$(cat "$OUTPUT_DIR/${KEY_NAME}.pub")"
+
+echo ""
+echo "══════════════════════════════════════════════════"
+echo "✅ Secrets added successfully to ${REPO}!"
+echo "══════════════════════════════════════════════════"
+echo ""
+echo "  SSH_PRIVATE_KEY"
+echo "  SSH_PUBLIC_KEY"
+echo ""
+
 echo "⚠️  NEVER commit the private key to Git!"
-echo "   Add keys/ to .gitignore"
+echo "   Ensure 'keys/' is in .gitignore"
