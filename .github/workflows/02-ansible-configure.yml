@@ -38,6 +38,7 @@ jobs:
   ansible-configure:
     name: "Run Ansible Playbook (Multi-OS)"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: |
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
@@ -68,19 +69,47 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deployer_key
           chmod 600 ~/.ssh/deployer_key
 
-      - name: Wait for EC2 instances to be ready
-        run: |
-          echo "Waiting for EC2 instances to fully initialize..."
-          echo "  Linux instances: ~60s for SSH"
-          echo "  Windows instances: ~180s for WinRM"
-          sleep 180
-
-      - name: Save inventory JSON (used by subsequent steps)
+      - name: Save inventory JSON (used by polling & subsequent steps)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
           ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/tmp/ansible-warnings.txt
           echo "Inventory saved. Hosts discovered:"
           python3 ../scripts/inventory-host-details.py < /tmp/ansible-inventory.json
+
+      - name: Wait for EC2 instances to be ready
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          echo "Polling SSH/WinRM connectivity (up to 180s)..."
+
+          # Poll Linux hosts via SSH
+          for group in tag_OS_Type_amazon_linux tag_OS_Type_ubuntu tag_OS_Type_redhat; do
+            if python3 ../scripts/check-inventory-group.py "$group" < /tmp/ansible-inventory.json; then
+              echo "Polling SSH for $group..."
+              for i in $(seq 1 18); do
+                if ansible "$group" -i aws_ec2.yml -m ping --private-key ~/.ssh/deployer_key -v 2>/dev/null; then
+                  echo "$group is reachable."
+                  break
+                fi
+                echo "  Retry $i/18 for $group..."
+                sleep 10
+              done
+            fi
+          done
+
+          # Poll Windows hosts via WinRM
+          if python3 ../scripts/check-inventory-group.py tag_OS_Type_windows < /tmp/ansible-inventory.json; then
+            echo "Polling WinRM for tag_OS_Type_windows..."
+            for i in $(seq 1 18); do
+              if ansible tag_OS_Type_windows -i aws_ec2.yml -m ansible.windows.win_ping -v 2>/dev/null; then
+                echo "tag_OS_Type_windows is reachable."
+                break
+              fi
+              echo "  Retry $i/18 for Windows hosts..."
+              sleep 10
+            done
+          fi
+
+          echo "EC2 connectivity polling complete."
 
       - name: Test dynamic inventory — list all groups
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
@@ -102,7 +131,7 @@ jobs:
           for group in tag_OS_Type_amazon_linux tag_OS_Type_ubuntu tag_OS_Type_redhat; do
             if python3 ../scripts/check-inventory-group.py "$group" < /tmp/ansible-inventory.json; then
               echo "Testing SSH to group: $group"
-              ansible "$group" -i aws_ec2.yml -m ping --private-key ~/.ssh/deployer_key || true
+              ansible "$group" -i aws_ec2.yml -m ping --private-key ~/.ssh/deployer_key
             else
               echo "No hosts in group: $group (skipping)"
             fi
@@ -137,19 +166,25 @@ jobs:
 
       - name: Run Ansible playbook (site.yml orchestration)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
-        continue-on-error: true
         run: |
           LIMIT="${{ github.event.inputs.limit || 'all' }}"
           TAGS="${{ github.event.inputs.tags }}"
 
-          CMD="ansible-playbook -i aws_ec2.yml playbooks/site.yml"
-          CMD="$CMD --private-key ~/.ssh/deployer_key"
-          CMD="$CMD --limit $LIMIT"
-          [ -n "$TAGS" ] && CMD="$CMD --tags $TAGS"
-          CMD="$CMD -v"
+          echo "LIMIT=$LIMIT"
+          echo "TAGS=${TAGS:-<none>}"
 
-          echo "Running: $CMD"
-          eval $CMD
+          if [ -n "$TAGS" ]; then
+            ansible-playbook -i aws_ec2.yml playbooks/site.yml \
+              --private-key ~/.ssh/deployer_key \
+              --limit "$LIMIT" \
+              --tags "$TAGS" \
+              -v
+          else
+            ansible-playbook -i aws_ec2.yml playbooks/site.yml \
+              --private-key ~/.ssh/deployer_key \
+              --limit "$LIMIT" \
+              -v
+          fi
 
       - name: Verify web servers are responding
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
