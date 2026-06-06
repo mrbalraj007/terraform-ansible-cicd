@@ -35,3 +35,8 @@ Thumbs.db
 # Txt files
 .txt
 *.txt
+
+# Claud files
+.claud/
+.claud/*
+CLAUDE.md

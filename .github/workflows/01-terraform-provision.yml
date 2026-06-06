@@ -5,8 +5,6 @@ on:
     secrets:
       AWS_IAM_ROLE_ARN:
         required: true
-      SSH_PUBLIC_KEY:
-        required: true
 
   push:
     branches: [main]
@@ -89,6 +87,14 @@ jobs:
             echo "has_servers=false" >> $GITHUB_OUTPUT
             echo "server_count=0" >> $GITHUB_OUTPUT
           fi
+
+      - name: Read SSH public key from repo
+        id: ssh-key
+        run: |
+          KEY_CONTENT=$(cat scripts/keys/deployer_key.pub)
+          echo "public_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$KEY_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Terraform Plan
         id: plan
@@ -202,6 +208,14 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init
+
+      - name: Read SSH public key from repo
+        id: ssh-key-destroy
+        run: |
+          KEY_CONTENT=$(cat scripts/keys/deployer_key.pub)
+          echo "public_key<<EOF" >> $GITHUB_OUTPUT
+          echo "$KEY_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
