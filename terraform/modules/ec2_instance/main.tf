@@ -143,16 +143,16 @@ resource "aws_instance" "this" {
   })
 }
 
-# ──── Elastic IP (Windows needs static IP for WinRM trust) ─────────────────
-resource "aws_eip" "this" {
-  count    = var.os_type == "windows" && var.assign_public_ip ? var.instance_count : 0
-  domain   = "vpc"
-  instance = aws_instance.this[count.index].id
-
-  tags = merge(var.common_tags, {
-    Name        = "${var.instance_name}-${var.environment}-${count.index + 1}-eip"
-    Environment = var.environment
-    Project     = var.project_name
-    OS_Type     = var.os_type
-  })
-}
+# ──── Elastic IP (disabled — Windows now uses auto-assigned public IP) ──────
+# resource "aws_eip" "this" {
+#   count    = var.os_type == "windows" && var.assign_public_ip ? var.instance_count : 0
+#   domain   = "vpc"
+#   instance = aws_instance.this[count.index].id
+#
+#   tags = merge(var.common_tags, {
+#     Name        = "${var.instance_name}-${var.environment}-${count.index + 1}-eip"
+#     Environment = var.environment
+#     Project     = var.project_name
+#     OS_Type     = var.os_type
+#   })
+# }
