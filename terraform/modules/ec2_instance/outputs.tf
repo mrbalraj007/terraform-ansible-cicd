@@ -47,7 +47,7 @@ output "instance_role" {
   value       = var.role
 }
 
-output "eip_addresses" {
-  description = "Elastic IP addresses (Windows instances only)"
-  value       = try(aws_eip.this[*].public_ip, [])
-}
+# output "eip_addresses" {
+#   description = "Elastic IP addresses (Windows instances only)"
+#   value       = try(aws_eip.this[*].public_ip, [])
+# }

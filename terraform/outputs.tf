@@ -16,7 +16,6 @@ output "server_groups" {
       os_type           = m.os_type
       role              = m.instance_role
       security_group_id = m.security_group_id
-      eip_addresses     = m.eip_addresses
     }
   }
 }
