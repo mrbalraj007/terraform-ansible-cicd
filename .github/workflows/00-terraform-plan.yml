@@ -100,6 +100,8 @@ jobs:
 
       - name: Add Plan Summary Comment to PR
         if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           PR_NUMBER="${{ github.event.pull_request.number }}"
           REPO="${{ github.repository }}"
