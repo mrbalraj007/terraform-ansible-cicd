@@ -90,6 +90,24 @@ resource "local_sensitive_file" "private_key" {
   file_permission = "0600"
 }
 
+# ──── Upload Private Key to S3 (for Ansible to retrieve) ───────────────────
+# After apply, the generated private key is uploaded to the S3 state bucket
+# under a "keys/" prefix. The Ansible workflow downloads it at runtime so
+# no GitHub Secret for SSH_PRIVATE_KEY is required.
+resource "null_resource" "upload_private_key" {
+  # Run after the key pair and local file are created
+  depends_on = [tls_private_key.ec2_key, local_sensitive_file.private_key]
+
+  provisioner "local-exec" {
+    command = "aws s3 cp '${path.module}/../scripts/${local.key_pair_name}.pem' 's3://${var.tf_state_bucket}/keys/${local.key_pair_name}.pem' --sse AES256"
+  }
+
+  triggers = {
+    # Re-upload whenever the private key changes (new apply = new key)
+    key_content = tls_private_key.ec2_key.private_key_pem
+  }
+}
+
 # ──── EC2 Instance Groups (one module call per server definition) ───────────
 # Each entry in var.servers creates a group of EC2 instances with matching
 # OS, security group, tags, and optional spot pricing.
