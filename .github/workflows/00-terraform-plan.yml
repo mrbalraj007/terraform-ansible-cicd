@@ -99,12 +99,6 @@ jobs:
           name: tfplan-pr-${{ github.event.pull_request.number }}
           path: ${{ env.TF_WORKING_DIR }}/tfplan
           retention-days: 5
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: tfplan-pr-${{ github.event.pull_request.number }}
-          path: ${{ env.TF_WORKING_DIR }}/tfplan
-          retention-days: 5
 
       - name: Add Plan Summary Comment to PR
         if: always()
