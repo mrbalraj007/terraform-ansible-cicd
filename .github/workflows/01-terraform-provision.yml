@@ -107,15 +107,13 @@ jobs:
           retention-days: 1
 
   # ==========================================================================
-  # Job 2: Apply — runs only when triggered via workflow_call (PR merge)
+  # Job 2: Apply — runs when called via workflow_call (from 03-full-cicd.yml)
   # ==========================================================================
   terraform-apply:
     name: "Terraform Apply"
     runs-on: ubuntu-latest
     needs: terraform-plan
-    # Only run when called via workflow_call (from 03-full-cicd.yml).
-    # workflow_dispatch with action=destroy is handled in the job below.
-    if: github.event_name == 'workflow_call'
+    # workflow_dispatch with action=destroy is handled in terraform-destroy job below.
     environment: dev
 
     steps:
