@@ -83,20 +83,54 @@ jobs:
           terraform plan \
             -var-file="terraform.tfvars" \
             -out=tfplan \
-            -detailed-exitcode 2>&1 | tee /tmp/plan-output.txt
+            -detailed-exitcode 2>&1 | sed 's/\x1b\[[0-9;]*m//g' | tee /tmp/plan-output.txt
           PLAN_EXIT=${PIPESTATUS[0]}
           exit $PLAN_EXIT
 
       - name: Terraform Plan Summary (Table)
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          terraform show -json tfplan | python3 ../scripts/plan-resource-table.py >> $GITHUB_STEP_SUMMARY
+          terraform show -json tfplan | python3 ../scripts/plan-resource-table.py
 
-      - name: Terraform Plan Output (Raw)
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tfplan-pr-${{ github.event.pull_request.number }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 5
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tfplan-pr-${{ github.event.pull_request.number }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 5
+
+      - name: Add Plan Summary Comment to PR
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -50 /tmp/plan-output.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+
+          # Build the PR comment body
+          {
+            echo '## Terraform Plan Summary'
+            echo
+            echo '### Resource Changes (from terraform show -json)'
+            terraform show -json tfplan | python3 ../scripts/plan-resource-table.py
+            echo
+            echo '### Plan Output'
+            echo '```'
+            tail -60 /tmp/plan-output.txt
+            echo '```'
+            echo
+            echo "*Plan artifact: tfplan-pr-${PR_NUMBER}*"
+          } > /tmp/pr_comment.txt
+
+          gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --field "body=@/tmp/pr_comment.txt"
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4

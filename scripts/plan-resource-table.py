@@ -101,20 +101,18 @@ def main():
     else:
         plan_data = json.load(sys.stdin)
 
-    planned_changes = plan_data.get("planned_changes", [])
-    resource_changes = {}
-    for chg in planned_changes:
-        addr = chg.get("address", "")
-        resource_changes[addr] = chg
+    # terraform show -json tfplan output structure:
+    # { "changes": { "resource_changes": [ { "address", "actions": ["create"], ... }, ... ] } }
+    changes_list = plan_data.get("changes", {}).get("resource_changes", [])
 
     # Group by module instance (e.g. server_group["app-ubuntu-1"])
     server_groups = {}
     other_changes = []
 
-    for addr, change in resource_changes.items():
-        action = change.get("action", [])
-        if isinstance(action, list):
-            action = action[0] if action else "no-op"
+    for chg in changes_list:
+        addr = chg.get("address", "")
+        actions = chg.get("actions", [])
+        action = actions[0] if actions else "no-op"
 
         parsed = parse_resource_address(addr)
 
