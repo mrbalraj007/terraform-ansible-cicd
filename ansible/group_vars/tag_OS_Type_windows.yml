@@ -8,6 +8,9 @@ ansible_winrm_server_cert_validation: ignore
 ansible_winrm_transport: basic
 ansible_winrm_scheme: https
 ansible_port: 5986
+ansible_winrm_connection_timeout: 60
+ansible_winrm_operation_timeout_sec: 60
+ansible_winrm_read_timeout_sec: 90
 ansible_become: true
 ansible_become_method: runas
 ansible_become_user: SYSTEM
