@@ -1,0 +1,114 @@
+name: "0 - Terraform Plan (PR Check)"
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+
+env:
+  TF_VERSION: "latest"
+  AWS_REGION: "us-east-1"
+  TF_WORKING_DIR: "./terraform"
+  TF_VAR_tf_state_bucket: ${{ secrets.TF_VAR_TF_STATE_BUCKET }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform-plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_IAM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          audience: sts.amazonaws.com
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          INIT_ARGS=""
+          if [ -n "$TF_VAR_tf_state_bucket" ]; then
+            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          fi
+          terraform init $INIT_ARGS
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Terraform Format Check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          if terraform fmt -check -recursive; then
+            echo "✓ Formatting OK"
+          else
+            echo "✗ Formatting issues found — run 'cd terraform && terraform fmt -recursive' locally"
+            exit 1
+          fi
+
+      - name: Parse server definitions
+        id: parse-servers
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          if grep -q "^servers" terraform.tfvars; then
+            echo "has_servers=true" >> $GITHUB_OUTPUT
+            echo "### Server Inventory" >> $GITHUB_STEP_SUMMARY
+            echo '| # | Name | OS Type | Instance Type | Count | Volume Size | Role |' >> $GITHUB_STEP_SUMMARY
+            echo '|---|------|---------|---------------|-------|-------------|------|' >> $GITHUB_STEP_SUMMARY
+            python3 ../scripts/parse-servers-to-summary.py >> $GITHUB_STEP_SUMMARY
+          else
+            echo "has_servers=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform plan \
+            -var-file="terraform.tfvars" \
+            -out=tfplan \
+            -detailed-exitcode 2>&1 | tee /tmp/plan-output.txt
+          PLAN_EXIT=${PIPESTATUS[0]}
+          # Attach plan output to summary
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -50 /tmp/plan-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          exit $PLAN_EXIT
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tfplan-pr-${{ github.event.pull_request.number }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 5
+
+      - name: Add Plan Summary Comment to PR
+        if: always()
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          REPO="${{ github.repository }}"
+          PLAN_SUMMARY=$(tail -80 /tmp/plan-output.txt)
+
+          gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" \
+            --field "body=## Terraform Plan Output
+
+\`\`\`
+$PLAN_SUMMARY
+\`\`\`
+
+*Plan artifact: tfplan-pr-$PR_NUMBER*"
