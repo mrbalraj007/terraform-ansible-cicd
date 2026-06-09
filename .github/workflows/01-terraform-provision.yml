@@ -1,19 +1,22 @@
 name: "1 - Terraform Provision Infrastructure"
 
-on:
+"on":
+  # Called by 03-full-cicd.yml when PR merges to main (action=apply)
   workflow_call:
     secrets:
       AWS_IAM_ROLE_ARN:
         required: true
-      SSH_PUBLIC_KEY:
-        required: true
       TF_VAR_WINRM_PASSWORD:
         required: false
+    inputs:
+      action:
+        description: "Terraform action to run"
+        required: false
+        default: "plan"
+        type: string
+        options: [plan, apply]
 
-  push:
-    branches: [main]
-    paths:
-      - "terraform/**"
+  # Manual trigger (plan or destroy only — apply requires workflow_call)
   workflow_dispatch:
     inputs:
       action:
@@ -21,13 +24,12 @@ on:
         required: true
         default: "plan"
         type: choice
-        options: [plan, apply, destroy]
+        options: [plan, destroy]
 
 env:
   TF_VERSION: "latest"
   AWS_REGION: "us-east-1"
   TF_WORKING_DIR: "./terraform"
-  TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
   TF_VAR_winrm_password: ${{ secrets.TF_VAR_WINRM_PASSWORD }}
   TF_VAR_tf_state_bucket: ${{ secrets.TF_VAR_TF_STATE_BUCKET }}
 
@@ -37,15 +39,11 @@ permissions:
 
 jobs:
   # ==========================================================================
-  # Job 1: Validate & Plan
+  # Job 1: Validate & Plan (always runs first)
   # ==========================================================================
   terraform-plan:
     name: "Terraform Plan"
     runs-on: ubuntu-latest
-    outputs:
-      tfplan_exitcode: ${{ steps.plan.outputs.exitcode }}
-      has_servers: ${{ steps.parse-servers.outputs.has_servers }}
-      server_count: ${{ steps.parse-servers.outputs.server_count }}
 
     steps:
       - name: Checkout repository
@@ -114,15 +112,13 @@ jobs:
           retention-days: 1
 
   # ==========================================================================
-  # Job 2: Apply (only on main push or manual apply)
+  # Job 2: Apply (runs only when action=apply, i.e. via workflow_call from 03)
   # ==========================================================================
   terraform-apply:
     name: "Terraform Apply"
     runs-on: ubuntu-latest
     needs: terraform-plan
-    if: |
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' || github.event.inputs.action == 'apply')
+    if: github.event.inputs.action == 'apply' || github.event_name == 'workflow_call'
     environment: dev
 
     steps:
@@ -183,7 +179,7 @@ jobs:
           terraform output -json | python3 ../scripts/generate-ansible-host-map.py
 
   # ==========================================================================
-  # Job 3: Destroy (manual only)
+  # Job 3: Destroy (manual only via workflow_dispatch)
   # ==========================================================================
   terraform-destroy:
     name: "Terraform Destroy"

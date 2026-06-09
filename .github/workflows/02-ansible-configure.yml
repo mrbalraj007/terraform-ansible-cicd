@@ -1,22 +1,12 @@
 name: "2 - Ansible Configure Instances"
 
-on:
+"on":
   workflow_call:
     secrets:
       AWS_IAM_ROLE_ARN:
         required: true
-      SSH_PRIVATE_KEY:
-        required: true
-      SSH_PUBLIC_KEY:
-        required: false
 
-  # Triggered automatically after Terraform Apply succeeds
-  workflow_run:
-    workflows: ["1 - Terraform Provision Infrastructure"]
-    types: [completed]
-    branches: [main]
-
-  # Also allow manual trigger
+  # Allow manual trigger (standalone)
   workflow_dispatch:
     inputs:
       limit:
@@ -40,9 +30,11 @@ jobs:
   ansible-configure:
     name: "Run Ansible Playbook (Multi-OS)"
     runs-on: ubuntu-latest
+    # Always run when called via workflow_call (from 03-full-cicd.yml)
+    # or when manually triggered via workflow_dispatch
     if: |
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event_name == 'workflow_call' ||
+      github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
@@ -64,11 +56,33 @@ jobs:
           pip install ansible boto3 botocore pywinrm
           ansible-galaxy collection install -r requirements.yml
 
-      - name: Write SSH private key from repo secret
+      - name: Download Terraform outputs (workflow_call path)
+        if: github.event_name == 'workflow_call'
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-outputs
+          path: ../terraform-outputs
+
+      - name: Download private key from S3
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deployer_key
+          # When called via workflow_call (03-full-cicd.yml), read the S3 URI
+          # from the terraform-outputs artifact and download the key.
+          # When called via workflow_dispatch (standalone), use repo vars.
+          if [ -f "../terraform-outputs/terraform-outputs.json" ]; then
+            echo "Using S3 URI from terraform-outputs artifact..."
+            S3_URI=$(python3 -c "
+              import json, sys
+              data = json.load(sys.stdin)
+              print(data.get('private_key_s3_uri', {}).get('value', ''))
+            " < ../terraform-outputs/terraform-outputs.json)
+            aws s3 cp "$S3_URI" ~/.ssh/deployer_key
+          else
+            echo "Using S3 URI from repo vars..."
+            aws s3 cp "s3://${{ vars.TF_STATE_BUCKET }}/keys/${{ vars.KEY_PAIR_NAME }}.pem" ~/.ssh/deployer_key
+          fi
           chmod 600 ~/.ssh/deployer_key
+          echo "Private key ready at ~/.ssh/deployer_key"
 
       - name: Wait for EC2 instances to be ready
         run: |

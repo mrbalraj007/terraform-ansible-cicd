@@ -21,11 +21,6 @@ variable "environment" {
   default     = "dev"
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key content — injected via GitHub Secret TF_VAR_ssh_public_key, used to create the AWS key pair"
-  type        = string
-  sensitive   = true
-}
 
 variable "allowed_ssh_cidr" {
   description = "CIDR blocks allowed for SSH (Linux) / RDP (Windows) access"
@@ -64,6 +59,12 @@ variable "winrm_password" {
   description = "Password for the Windows WinRM local admin account (ansible_admin). Injected via TF_VAR_WINRM_PASSWORD from GitHub Actions secrets."
   type        = string
   sensitive   = true
+  default     = ""
+}
+
+variable "tf_state_bucket" {
+  description = "S3 bucket name for Terraform state (used as shared store for the deployer private key). Injected via TF_VAR_tf_state_bucket from GitHub Actions secrets."
+  type        = string
   default     = ""
 }
 

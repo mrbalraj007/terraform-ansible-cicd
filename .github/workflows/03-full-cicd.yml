@@ -1,14 +1,22 @@
 name: "3 - Full CI/CD Pipeline (Provision + Configure)"
 
-on:
+"on":
+  # Triggers when a PR is merged into main (push to main)
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+      - "ansible/**"
+      - "scripts/**"
+
+  # Allow manual trigger (full pipeline or individual jobs)
   workflow_dispatch:
     inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        default: "dev"
-        type: choice
-        options: [dev, staging, prod]
+      skip_ansible:
+        description: "Skip Ansible configure step"
+        required: false
+        default: "false"
+        type: boolean
 
 permissions:
   id-token: write
@@ -16,12 +24,18 @@ permissions:
 
 jobs:
   provision:
-    name: "Terraform Provision"
+    name: "Terraform Provision (Apply)"
     uses: ./.github/workflows/01-terraform-provision.yml
     secrets: inherit
+    with:
+      action: apply
 
   configure:
     name: "Ansible Configure (Multi-OS)"
     needs: provision
+    if: |
+      always() &&
+      needs.provision.result == 'success' &&
+      github.event.inputs.skip_ansible != 'true'
     uses: ./.github/workflows/02-ansible-configure.yml
     secrets: inherit

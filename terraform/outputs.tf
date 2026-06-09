@@ -72,6 +72,11 @@ output "private_key_path" {
   sensitive   = true
 }
 
+output "private_key_s3_uri" {
+  description = "S3 URI of the generated private key (Ansible downloads this at runtime)"
+  value       = "s3://${var.tf_state_bucket}/keys/${local.key_pair_name}.pem"
+}
+
 # ──── Summary ───────────────────────────────────────────────────────────────
 
 output "deployment_summary" {
