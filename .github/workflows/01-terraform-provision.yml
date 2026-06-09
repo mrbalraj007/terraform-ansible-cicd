@@ -59,11 +59,12 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          INIT_ARGS=""
-          if [ -n "$TF_VAR_tf_state_bucket" ]; then
-            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          if [ -z "$TF_VAR_tf_state_bucket" ]; then
+            echo "ERROR: TF_VAR_tf_state_bucket is not set."
+            echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
+            exit 1
           fi
-          terraform init $INIT_ARGS
+          terraform init -backend-config=bucket=$TF_VAR_tf_state_bucket
 
       - name: Terraform Validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -136,11 +137,12 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          INIT_ARGS=""
-          if [ -n "$TF_VAR_tf_state_bucket" ]; then
-            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          if [ -z "$TF_VAR_tf_state_bucket" ]; then
+            echo "ERROR: TF_VAR_tf_state_bucket is not set."
+            echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
+            exit 1
           fi
-          terraform init $INIT_ARGS
+          terraform init -backend-config=bucket=$TF_VAR_tf_state_bucket
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
@@ -202,11 +204,12 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          INIT_ARGS="-reconfigure"
-          if [ -n "$TF_VAR_tf_state_bucket" ]; then
-            INIT_ARGS="-reconfigure -backend-config=bucket=$TF_VAR_tf_state_bucket"
+          if [ -z "$TF_VAR_tf_state_bucket" ]; then
+            echo "ERROR: TF_VAR_tf_state_bucket is not set."
+            echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
+            exit 1
           fi
-          terraform init $INIT_ARGS
+          terraform init -reconfigure -backend-config=bucket=$TF_VAR_tf_state_bucket
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
