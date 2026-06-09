@@ -3,7 +3,7 @@
 # Define your server inventory here. Each entry creates one group of EC2
 # instances with matching OS, security group, and Ansible inventory tags.
 # The pipeline reads this file during `terraform plan`.
-################################################################################
+###############################################################################
 
 aws_region     = "us-east-1"
 project_name   = "tf-ansible-demo"
