@@ -64,7 +64,10 @@ jobs:
             echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
             exit 1
           fi
-          terraform init -backend-config=bucket=$TF_VAR_tf_state_bucket
+          terraform init \
+            -backend-config=bucket=$TF_VAR_tf_state_bucket \
+            -backend-config=key=terraform.tfstate \
+            -backend-config=region=$AWS_REGION
 
       - name: Terraform Validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -142,7 +145,10 @@ jobs:
             echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
             exit 1
           fi
-          terraform init -backend-config=bucket=$TF_VAR_tf_state_bucket
+          terraform init \
+            -backend-config=bucket=$TF_VAR_tf_state_bucket \
+            -backend-config=key=terraform.tfstate \
+            -backend-config=region=$AWS_REGION
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
@@ -209,7 +215,11 @@ jobs:
             echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
             exit 1
           fi
-          terraform init -reconfigure -backend-config=bucket=$TF_VAR_tf_state_bucket
+          terraform init \
+            -reconfigure \
+            -backend-config=bucket=$TF_VAR_tf_state_bucket \
+            -backend-config=key=terraform.tfstate \
+            -backend-config=region=$AWS_REGION
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
