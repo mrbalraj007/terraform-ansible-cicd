@@ -59,11 +59,15 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          INIT_ARGS=""
-          if [ -n "$TF_VAR_tf_state_bucket" ]; then
-            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          if [ -z "$TF_VAR_tf_state_bucket" ]; then
+            echo "ERROR: TF_VAR_tf_state_bucket is not set."
+            echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
+            exit 1
           fi
-          terraform init $INIT_ARGS
+          terraform init \
+            -backend-config=bucket=$TF_VAR_tf_state_bucket \
+            -backend-config=key=terraform.tfstate \
+            -backend-config=region=$AWS_REGION
 
       - name: Terraform Validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -113,7 +117,8 @@ jobs:
     name: "Terraform Apply"
     runs-on: ubuntu-latest
     needs: terraform-plan
-    # workflow_dispatch with action=destroy is handled in terraform-destroy job below.
+    # Skip when user explicitly triggers destroy; terraform-destroy job handles that.
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.action != 'destroy'
     environment: dev
 
     steps:
@@ -135,11 +140,15 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          INIT_ARGS=""
-          if [ -n "$TF_VAR_tf_state_bucket" ]; then
-            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          if [ -z "$TF_VAR_tf_state_bucket" ]; then
+            echo "ERROR: TF_VAR_tf_state_bucket is not set."
+            echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
+            exit 1
           fi
-          terraform init $INIT_ARGS
+          terraform init \
+            -backend-config=bucket=$TF_VAR_tf_state_bucket \
+            -backend-config=key=terraform.tfstate \
+            -backend-config=region=$AWS_REGION
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
@@ -201,11 +210,16 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: |
-          INIT_ARGS="-reconfigure"
-          if [ -n "$TF_VAR_tf_state_bucket" ]; then
-            INIT_ARGS="-reconfigure -backend-config=bucket=$TF_VAR_tf_state_bucket"
+          if [ -z "$TF_VAR_tf_state_bucket" ]; then
+            echo "ERROR: TF_VAR_tf_state_bucket is not set."
+            echo "Set TF_VAR_TF_STATE_BUCKET in GitHub repo → Settings → Secrets and Variables → Actions."
+            exit 1
           fi
-          terraform init $INIT_ARGS
+          terraform init \
+            -reconfigure \
+            -backend-config=bucket=$TF_VAR_tf_state_bucket \
+            -backend-config=key=terraform.tfstate \
+            -backend-config=region=$AWS_REGION
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
