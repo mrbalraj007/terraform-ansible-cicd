@@ -27,8 +27,6 @@ jobs:
     name: "Terraform Provision (Apply)"
     uses: ./.github/workflows/01-terraform-provision.yml
     secrets: inherit
-    with:
-      action: apply
 
   configure:
     name: "Ansible Configure (Multi-OS)"
