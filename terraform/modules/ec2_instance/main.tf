@@ -87,7 +87,16 @@ resource "aws_instance" "this" {
   subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
   vpc_security_group_ids      = concat([aws_security_group.this.id], var.additional_sg_ids)
   associate_public_ip_address = var.assign_public_ip
-  user_data_base64            = var.user_data_script != "" ? var.user_data_script : null
+  # Inject winrm_password into user_data if present (Windows only)
+  user_data_base64 = var.user_data_script != "" ? (
+    var.winrm_password != "" ? base64encode(
+      replace(
+        base64decode(var.user_data_script),
+        "${WINRM_PASSWORD}",
+        var.winrm_password
+      )
+    ) : var.user_data_script
+  ) : null
 
   # ── Spot instance (optional) ─────────────────────────────────────────────
   dynamic "instance_market_options" {

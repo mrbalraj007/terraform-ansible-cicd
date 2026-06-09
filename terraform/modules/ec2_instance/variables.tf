@@ -142,3 +142,10 @@ variable "user_data_script" {
   type        = string
   default     = ""
 }
+
+variable "winrm_password" {
+  description = "Password for the WinRM local admin account (ansible_admin). Injected via TF_VAR_WINrm_password from GitHub Actions secrets."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

@@ -74,7 +74,7 @@ jobs:
         run: |
           echo "Waiting for EC2 instances to fully initialize..."
           echo "  Linux instances: ~60s for SSH"
-          echo "  Windows instances: ~180s for WinRM"
+          echo "  Windows instances: ~120s for WinRM"
           sleep 120
 
       - name: Save inventory JSON (used by subsequent steps)

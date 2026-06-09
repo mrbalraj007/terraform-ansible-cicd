@@ -66,6 +66,14 @@ output "admin_user_map" {
 
 # ──── Summary ───────────────────────────────────────────────────────────────
 
+output "private_key_path" {
+  description = "Path to the generated private key file (used by Ansible for SSH/RDP)"
+  value       = "${path.module}/../scripts/${local.key_pair_name}.pem"
+  sensitive   = true
+}
+
+# ──── Summary ───────────────────────────────────────────────────────────────
+
 output "deployment_summary" {
   description = "Human-readable summary of the deployed infrastructure"
   value = join("\n", concat([

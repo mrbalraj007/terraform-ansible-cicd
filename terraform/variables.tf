@@ -60,6 +60,13 @@ variable "enable_volume_encryption" {
   default     = true
 }
 
+variable "winrm_password" {
+  description = "Password for the Windows WinRM local admin account (ansible_admin). Injected via TF_VAR_WINRM_PASSWORD from GitHub Actions secrets."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # ──── Server Definitions (THE core variable) ────────────────────────────────
 # Users define their servers as a list of objects in terraform.tfvars:
 #

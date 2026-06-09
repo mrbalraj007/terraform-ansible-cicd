@@ -7,6 +7,8 @@ on:
         required: true
       SSH_PUBLIC_KEY:
         required: true
+      TF_VAR_WINRM_PASSWORD:
+        required: false
 
   push:
     branches: [main]
@@ -26,6 +28,8 @@ env:
   AWS_REGION: "us-east-1"
   TF_WORKING_DIR: "./terraform"
   TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+  TF_VAR_winrm_password: ${{ secrets.TF_VAR_WINRM_PASSWORD }}
+  TF_VAR_tf_state_bucket: ${{ secrets.TF_VAR_TF_STATE_BUCKET }}
 
 permissions:
   id-token: write
@@ -61,7 +65,12 @@ jobs:
 
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init
+        run: |
+          INIT_ARGS=""
+          if [ -n "$TF_VAR_tf_state_bucket" ]; then
+            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          fi
+          terraform init $INIT_ARGS
 
       - name: Terraform Validate
         working-directory: ${{ env.TF_WORKING_DIR }}
@@ -134,7 +143,12 @@ jobs:
 
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init
+        run: |
+          INIT_ARGS=""
+          if [ -n "$TF_VAR_tf_state_bucket" ]; then
+            INIT_ARGS="-backend-config=bucket=$TF_VAR_tf_state_bucket"
+          fi
+          terraform init $INIT_ARGS
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
@@ -195,7 +209,12 @@ jobs:
 
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
-        run: terraform init
+        run: |
+          INIT_ARGS="-reconfigure"
+          if [ -n "$TF_VAR_tf_state_bucket" ]; then
+            INIT_ARGS="-reconfigure -backend-config=bucket=$TF_VAR_tf_state_bucket"
+          fi
+          terraform init $INIT_ARGS
 
       - name: Terraform Destroy
         working-directory: ${{ env.TF_WORKING_DIR }}
