@@ -92,7 +92,7 @@ resource "aws_instance" "this" {
     var.winrm_password != "" ? base64encode(
       replace(
         base64decode(var.user_data_script),
-        "${WINRM_PASSWORD}",
+        "$${WINRM_PASSWORD}",
         var.winrm_password
       )
     ) : var.user_data_script
