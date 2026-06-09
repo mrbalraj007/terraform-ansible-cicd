@@ -51,8 +51,7 @@ jobs:
           pip install ansible boto3 botocore pywinrm
           ansible-galaxy collection install -r requirements.yml
 
-      - name: Download Terraform outputs (workflow_call path)
-        if: github.event_name == 'workflow_call'
+      - name: Download Terraform outputs
         uses: actions/download-artifact@v4
         with:
           name: terraform-outputs
@@ -61,9 +60,9 @@ jobs:
       - name: Download private key from S3
         run: |
           mkdir -p ~/.ssh
-          # When called via workflow_call (03-full-cicd.yml), read the S3 URI
-          # from the terraform-outputs artifact and download the key.
-          # When called via workflow_dispatch (standalone), use repo vars.
+          # When triggered via workflow_call (03-full-cicd.yml), read the S3 URI
+          # from the terraform-outputs artifact. For workflow_dispatch (standalone),
+          # reconstruct the URI from the secret and known key pair name.
           if [ -f "../terraform-outputs/terraform-outputs.json" ]; then
             echo "Using S3 URI from terraform-outputs artifact..."
             S3_URI=$(python3 -c "
@@ -73,8 +72,8 @@ jobs:
             " < ../terraform-outputs/terraform-outputs.json)
             aws s3 cp "$S3_URI" ~/.ssh/deployer_key
           else
-            echo "Using S3 URI from repo vars..."
-            aws s3 cp "s3://${{ vars.TF_STATE_BUCKET }}/keys/${{ vars.KEY_PAIR_NAME }}.pem" ~/.ssh/deployer_key
+            echo "Using S3 URI from secrets (standalone mode)..."
+            aws s3 cp "s3://${{ secrets.TF_VAR_TF_STATE_BUCKET }}/keys/tf-ansible-demo-dev-deployer-key.pem" ~/.ssh/deployer_key
           fi
           chmod 600 ~/.ssh/deployer_key
           echo "Private key ready at ~/.ssh/deployer_key"
