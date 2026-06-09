@@ -30,11 +30,6 @@ jobs:
   ansible-configure:
     name: "Run Ansible Playbook (Multi-OS)"
     runs-on: ubuntu-latest
-    # Always run when called via workflow_call (from 03-full-cicd.yml)
-    # or when manually triggered via workflow_dispatch
-    if: |
-      github.event_name == 'workflow_call' ||
-      github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
