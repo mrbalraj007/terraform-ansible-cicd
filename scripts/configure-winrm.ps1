@@ -51,21 +51,39 @@ if ($enumOut -notmatch "Transport = HTTP") {
     Write-Log "HTTP listener already present"
 }
 
-# STEP 7 - Firewall rules + disable Windows Firewall
+# STEP 7 - Create HTTPS listener with self-signed cert
+$thumbprint = (Get-ChildItem Cert:\LocalMachine\My | Where-Object { $_.Subject -eq "CN=WINRM" } | Select-Object -First 1).Thumbprint
+if (-not $thumbprint) {
+    Write-Log "Creating self-signed certificate for WinRM HTTPS..."
+    $thumbprint = (New-SelfSignedCertificate -DnsName $env:COMPUTERNAME, WINRM -CertStoreLocation Cert:\LocalMachine\My).Thumbprint
+    Write-Log "Certificate created: $thumbprint"
+}
+$httpsExists = $enumOut -match "Transport = HTTPS"
+if (-not $httpsExists) {
+    & winrm create winrm/config/listener?Address=*+Transport=HTTPS "@{CertificateThumbprint=`"$thumbprint`"}"
+    Write-Log "HTTPS listener created with thumbprint $thumbprint"
+} else {
+    Write-Log "HTTPS listener already present"
+}
+
+# STEP 8 - Firewall rules + disable Windows Firewall
 netsh advfirewall firewall add rule name="WinRM-HTTP-5985" protocol=TCP dir=in localport=5985 action=allow
 netsh advfirewall firewall add rule name="WinRM-HTTPS-5986" protocol=TCP dir=in localport=5986 action=allow
 netsh advfirewall set allprofiles state off
 Write-Log "Firewall configured and disabled"
 
-# STEP 8 - Restart WinRM to apply all changes
+# STEP 9 - Restart WinRM to apply all changes
 Restart-Service WinRM -Force
 Start-Sleep -Seconds 5
 Write-Log "WinRM final status: $((Get-Service WinRM).Status)"
 
-# STEP 9 - Confirm port listening
-$listening = netstat -an | Select-String "0.0.0.0:5985"
-if ($listening) { Write-Log "Port 5985 LISTENING: OK" }
-else            { Write-Log "WARNING: Port 5985 not found in netstat" }
+# STEP 10 - Confirm ports listening
+$http = netstat -an | Select-String "0.0.0.0:5985"
+$https = netstat -an | Select-String "0.0.0.0:5986"
+if ($http)  { Write-Log "Port 5985 LISTENING: OK" }
+else        { Write-Log "WARNING: Port 5985 not found in netstat" }
+if ($https) { Write-Log "Port 5986 LISTENING: OK" }
+else        { Write-Log "WARNING: Port 5986 not found in netstat" }
 
 Write-Log "=== WinRM Bootstrap Complete ==="
 </powershell>

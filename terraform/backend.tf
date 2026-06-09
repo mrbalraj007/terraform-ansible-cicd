@@ -5,7 +5,7 @@
 # The empty backend "s3" {} block signals intent to use S3, so Terraform
 # doesn't warn when -backend-config is passed at init time.
 
-#################################################################################
+################################################################################
 terraform {
   backend "s3" {}
 }
