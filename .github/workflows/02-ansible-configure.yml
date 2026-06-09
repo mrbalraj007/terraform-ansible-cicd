@@ -65,12 +65,8 @@ jobs:
           # reconstruct the URI from the secret and known key pair name.
           if [ -f "../terraform-outputs/terraform-outputs.json" ]; then
             echo "Using S3 URI from terraform-outputs artifact..."
-            S3_URI=$(python3 -c "
-              import json, sys
-              data = json.load(sys.stdin)
-              print(data.get('private_key_s3_uri', {}).get('value', ''))
-            " < ../terraform-outputs/terraform-outputs.json)
-            aws s3 cp "$S3_URI" ~/.ssh/deployer_key
+            S3_URI=$(jq -r '.private_key_s3_uri.value // empty' < ../terraform-outputs/terraform-outputs.json)
+            [ -n "$S3_URI" ] && aws s3 cp "$S3_URI" ~/.ssh/deployer_key
           else
             echo "Using S3 URI from secrets (standalone mode)..."
             aws s3 cp "s3://${{ secrets.TF_VAR_TF_STATE_BUCKET }}/keys/tf-ansible-demo-dev-deployer-key.pem" ~/.ssh/deployer_key
