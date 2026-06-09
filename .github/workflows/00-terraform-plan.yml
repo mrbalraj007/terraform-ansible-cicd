@@ -102,6 +102,7 @@ jobs:
 
       - name: Add Plan Summary Comment to PR
         if: always()
+        working-directory: ${{ env.TF_WORKING_DIR }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
