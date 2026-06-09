@@ -14,7 +14,7 @@ Write-Log "ExecutionPolicy: Unrestricted"
 
 # STEP 2 - Create local admin for Ansible
 $AnsibleUser = "ansible_admin"
-$AnsiblePass = ConvertTo-SecureString "REPLACE_WITH_YOUR_PASSWORD" -AsPlainText -Force
+$AnsiblePass = ConvertTo-SecureString "${WINRM_PASSWORD}" -AsPlainText -Force
 if (Get-LocalUser -Name $AnsibleUser -ErrorAction SilentlyContinue) {
     Remove-LocalUser -Name $AnsibleUser
 }

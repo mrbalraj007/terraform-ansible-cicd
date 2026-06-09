@@ -20,11 +20,6 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket = "terraform-ansible-cicd" # Replace with your globally unique bucket name
-    key    = "terraform-ansible/terraform.tfstate"
-    region = "us-east-1"
-  }
 }
 
 provider "aws" {
@@ -57,19 +52,42 @@ EOWIN
 
   # Key pair name derived from project and environment
   key_pair_name = "${var.project_name}-${var.environment}-deployer-key"
+
+  # Common tags for key pair resources
+  common_tags = merge(var.common_tags, {
+    Project = var.project_name
+  })
 }
 
-# ──── Key Pair (created by Terraform — public key from GitHub Secret) ─────
-# Creates an AWS key pair using the public key content passed via TF_VAR_ssh_public_key.
-# The private key is stored in GitHub Secrets (SSH_PRIVATE_KEY) and used by Ansible.
+# ──── TLS Private Key (generated locally) ────────────────────────────────
+# Generates an RSA 4096-bit key pair. The private key is saved to disk
+# (scripts/<key_name>.pem) and used by Ansible for SSH/RDP access.
+# The public key is passed to the aws_key_pair resource below.
+resource "tls_private_key" "ec2_key" {
+  algorithm = "RSA"
+  rsa_bits  = 4096
+}
+
+# ──── Key Pair (uploaded to AWS) ─────────────────────────────────────────
+# Creates an AWS key pair using the public key from the TLS private key above.
+# The private key is stored locally and must be kept secure.
 resource "aws_key_pair" "deployer" {
   key_name   = local.key_pair_name
-  public_key = var.ssh_public_key
+  public_key = tls_private_key.ec2_key.public_key_openssh
 
-  tags = merge(var.common_tags, {
+  tags = merge(local.common_tags, {
     Environment = var.environment
     Project     = var.project_name
   })
+}
+
+# ──── Local Private Key File ──────────────────────────────────────────────
+# Saves the generated private key to disk so it can be used by Ansible
+# (SSH for Linux, RDP password decryption for Windows).
+resource "local_sensitive_file" "private_key" {
+  content         = tls_private_key.ec2_key.private_key_pem
+  filename        = "${path.module}/../scripts/${local.key_pair_name}.pem"
+  file_permission = "0600"
 }
 
 # ──── EC2 Instance Groups (one module call per server definition) ───────────
@@ -104,4 +122,5 @@ module "server_group" {
 
   # Pass the WinRM bootstrap script only to Windows instances
   user_data_script = each.value.os_type == "windows" ? local.windows_userdata_b64 : ""
+  winrm_password   = var.winrm_password
 }

@@ -1,4 +1,5 @@
 # Terraform
+backend.tf
 .terraform/
 .terraform.lock.hcl
 *.tfstate
