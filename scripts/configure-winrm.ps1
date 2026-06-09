@@ -1,30 +1,71 @@
-# Run this in PowerShell as Administrator after RDP-ing into the Windows instance
-# Script configures WinRM for Ansible connectivity
+<powershell>
+$LogFile = "C:\winrm_setup.log"
+function Write-Log {
+    param([string]$Message)
+    $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$ts  $Message" | Tee-Object -FilePath $LogFile -Append
+}
 
-Write-Host "Configuring WinRM..." -ForegroundColor Green
+Write-Log "=== WinRM Bootstrap Started ==="
 
-# 1. Enable PSRemoting and WinRM
+# STEP 1 - Execution policy
+Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force
+Write-Log "ExecutionPolicy: Unrestricted"
+
+# STEP 2 - Create local admin for Ansible
+$AnsibleUser = "ansible_admin"
+$AnsiblePass = ConvertTo-SecureString "REPLACE_WITH_YOUR_PASSWORD" -AsPlainText -Force
+if (Get-LocalUser -Name $AnsibleUser -ErrorAction SilentlyContinue) {
+    Remove-LocalUser -Name $AnsibleUser
+}
+New-LocalUser -Name $AnsibleUser -Password $AnsiblePass `
+    -FullName "Ansible Admin" -Description "WinRM service account" `
+    -PasswordNeverExpires
+Add-LocalGroupMember -Group "Administrators" -Member $AnsibleUser
+Write-Log "Created local admin: $AnsibleUser"
+
+# STEP 3 - Ensure WinRM is RUNNING before touching WSMan provider
+Set-Service  -Name WinRM -StartupType Automatic
+Start-Service -Name WinRM -ErrorAction SilentlyContinue
+Start-Sleep  -Seconds 3
+Write-Log "WinRM service: $((Get-Service WinRM).Status)"
+
+# STEP 4 - Enable PSRemoting
 Enable-PSRemoting -Force -SkipNetworkProfileCheck
-Set-NetConnectionProfile -NetworkCategory Private
+Start-Sleep -Seconds 2
+Write-Log "PSRemoting enabled"
 
-# 2. Configure WinRM — max memory, auth, and listeners
-winrm set winrm/config '@{MaxTimeoutms="1800000"}'
-winrm set winrm/config/winrs '@{MaxMemoryPerShellMB="1024"}'
-winrm set winrm/config/service '@{AllowUnencrypted="true"}'
+# STEP 5 - Configure via winrm.cmd (avoids WSMan drive hang)
+winrm set winrm/config/service      '@{AllowUnencrypted="true"}'
 winrm set winrm/config/service/auth '@{Basic="true"}'
+winrm set winrm/config/winrs        '@{MaxMemoryPerShellMB="1024"}'
+winrm set winrm/config              '@{MaxTimeoutms="1800000"}'
+Write-Log "WinRM settings applied"
 
-# 3. Create self-signed cert and HTTPS listener
-$cert = New-SelfSignedCertificate -DnsName $env:COMPUTERNAME -CertStoreLocation Cert:\LocalMachine\My
-New-Item -Path WSMan:\Localhost\Listener -Transport HTTPS -Address * -CertificateThumbprint $cert.Thumbprint -Force -ErrorAction SilentlyContinue
+# STEP 6 - Create HTTP listener if missing
+$enumOut = & winrm enumerate winrm/config/listener 2>&1
+if ($enumOut -notmatch "Transport = HTTP") {
+    & winrm create winrm/config/listener?Address=*+Transport=HTTP
+    Write-Log "HTTP listener created"
+} else {
+    Write-Log "HTTP listener already present"
+}
 
-# 4. Windows Firewall rules
-New-NetFirewallRule -DisplayName "WinRM HTTP"  -Direction Inbound -Protocol TCP -LocalPort 5985 -Action Allow -ErrorAction SilentlyContinue
-New-NetFirewallRule -DisplayName "WinRM HTTPS" -Direction Inbound -Protocol TCP -LocalPort 5986 -Action Allow -ErrorAction SilentlyContinue
+# STEP 7 - Firewall rules + disable Windows Firewall
+netsh advfirewall firewall add rule name="WinRM-HTTP-5985" protocol=TCP dir=in localport=5985 action=allow
+netsh advfirewall firewall add rule name="WinRM-HTTPS-5986" protocol=TCP dir=in localport=5986 action=allow
+netsh advfirewall set allprofiles state off
+Write-Log "Firewall configured and disabled"
 
-# 5. Restart WinRM service
+# STEP 8 - Restart WinRM to apply all changes
 Restart-Service WinRM -Force
+Start-Sleep -Seconds 5
+Write-Log "WinRM final status: $((Get-Service WinRM).Status)"
 
-# 6. Verify
-winrm enumerate winrm/config/Listener
+# STEP 9 - Confirm port listening
+$listening = netstat -an | Select-String "0.0.0.0:5985"
+if ($listening) { Write-Log "Port 5985 LISTENING: OK" }
+else            { Write-Log "WARNING: Port 5985 not found in netstat" }
 
-Write-Host "WinRM configured. Test: Test-WSMan -ComputerName localhost" -ForegroundColor Green
+Write-Log "=== WinRM Bootstrap Complete ==="
+</powershell>
