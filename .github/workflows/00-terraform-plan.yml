@@ -85,11 +85,18 @@ jobs:
             -out=tfplan \
             -detailed-exitcode 2>&1 | tee /tmp/plan-output.txt
           PLAN_EXIT=${PIPESTATUS[0]}
-          # Attach plan output to summary
+          exit $PLAN_EXIT
+
+      - name: Terraform Plan Summary (Table)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform show -json tfplan | python3 ../scripts/plan-resource-table.py >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform Plan Output (Raw)
+        run: |
           echo '```' >> $GITHUB_STEP_SUMMARY
           tail -50 /tmp/plan-output.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          exit $PLAN_EXIT
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
