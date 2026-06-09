@@ -1,7 +1,8 @@
 name: "0 - Terraform Plan (PR Check)"
 
-on:
+"on":
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [main]
     paths:
       - "terraform/**"
@@ -104,11 +105,8 @@ jobs:
           REPO="${{ github.repository }}"
           PLAN_SUMMARY=$(tail -80 /tmp/plan-output.txt)
 
+          # Build the comment body and write to a temp file
+          printf '## Terraform Plan Output\n\n```\n%s\n```\n\n*Plan artifact: tfplan-pr-%s*\n' "$PLAN_SUMMARY" "$PR_NUMBER" > /tmp/pr_comment.txt
+
           gh api --method POST "repos/$REPO/issues/$PR_NUMBER/comments" \
-            --field "body=## Terraform Plan Output
-
-\`\`\`
-$PLAN_SUMMARY
-\`\`\`
-
-*Plan artifact: tfplan-pr-$PR_NUMBER*"
+            --field "body@/tmp/pr_comment.txt"

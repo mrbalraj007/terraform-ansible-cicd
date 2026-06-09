@@ -1,6 +1,6 @@
 name: "1 - Terraform Provision Infrastructure"
 
-on:
+"on":
   # Called by 03-full-cicd.yml when PR merges to main (action=apply)
   workflow_call:
     secrets:

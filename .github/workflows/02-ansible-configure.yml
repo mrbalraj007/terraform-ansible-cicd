@@ -1,6 +1,6 @@
 name: "2 - Ansible Configure Instances"
 
-on:
+"on":
   workflow_call:
     secrets:
       AWS_IAM_ROLE_ARN:

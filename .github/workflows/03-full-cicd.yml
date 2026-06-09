@@ -1,6 +1,6 @@
 name: "3 - Full CI/CD Pipeline (Provision + Configure)"
 
-on:
+"on":
   # Triggers when a PR is merged into main (push to main)
   push:
     branches: [main]
