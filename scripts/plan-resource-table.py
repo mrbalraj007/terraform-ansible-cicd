@@ -30,20 +30,25 @@ def parse_resource_address(addr):
         "full_name": addr,
     }
 
+    # Pattern 1: indexed module resources — module.server_group["app-ubuntu-1"].aws_instance.this[0]
+    # Captures module name WITHOUT "module." prefix, so we reconstruct it below.
     m = re.match(r"module\.(.+?)\.(.+?)\[(.+?)\]$", addr)
     if m:
-        result["module"] = m.group(1)  # e.g. "server_group"
-        resource_part = m.group(2)      # e.g. "aws_instance.this"
-        result["index"] = m.group(3)    # e.g. "0"
+        module_name = m.group(1)           # e.g. "server_group"
+        resource_part = m.group(2)         # e.g. "aws_instance.this"
+        result["index"] = m.group(3)      # e.g. "0"
+        result["module"] = module_name     # e.g. "server_group["app-ubuntu-1"]"
         parts = resource_part.rsplit(".", 1)
         result["resource_type"] = parts[0]
-        result["resource_name"] = parts[1]
+        # Strip [index] suffix from resource_name (e.g. "this[0]" -> "this")
+        result["resource_name"] = re.sub(r"\[\d+\]$", "", parts[1])
         return result
 
-    # No module prefix: module.server_group["app-ubuntu-1"].aws_instance.this
+    # Pattern 2: non-indexed module resources — module.server_group["app-ubuntu-1"].aws_security_group.this
+    # Captures module name WITH "module." prefix (e.g. "module.server_group["app-ubuntu-1"]").
     m = re.match(r"(module\.[^.]+)\.(.+)$", addr)
     if m:
-        result["module"] = m.group(1)
+        result["module"] = m.group(1)     # e.g. "module.server_group["app-ubuntu-1"]"
         resource_part = m.group(2)
         parts = resource_part.rsplit(".", 1)
         result["resource_type"] = parts[0]
@@ -116,7 +121,10 @@ def main():
 
         parsed = parse_resource_address(addr)
 
-        if parsed["module"] and parsed["module"].startswith("module."):
+        # module_key is either "server_group[...]" (Pattern 1) or "module.server_group[...]" (Pattern 2)
+        if parsed["module"] and (
+            parsed["module"].startswith("module.") or parsed["module"].startswith("server_group[")
+        ):
             module_key = parsed["module"].replace("module.", "")
             if module_key not in server_groups:
                 server_groups[module_key] = []
