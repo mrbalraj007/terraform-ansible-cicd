@@ -8,6 +8,8 @@ name: "1 - Terraform Provision Infrastructure"
         required: true
       TF_VAR_WINRM_PASSWORD:
         required: false
+      TF_VAR_TF_STATE_BUCKET:
+        required: true
 
   # ── Manual trigger (plan or destroy only — apply must go through workflow_call) ──
   workflow_dispatch:

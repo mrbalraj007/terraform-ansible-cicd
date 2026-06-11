@@ -43,12 +43,8 @@ data "aws_subnets" "default" {
 
 locals {
   # Base64-encoded Windows user_data script that configures WinRM for Ansible
-  windows_userdata_b64 = base64encode(<<-EOWIN
-<powershell>
-${file("../scripts/configure-winrm.ps1")}
-</powershell>
-EOWIN
-  )
+  # The configure-winrm.ps1 script already includes <powershell> tags
+  windows_userdata_b64 = base64encode(file("../scripts/configure-winrm.ps1"))
 
   # Key pair name derived from project and environment
   key_pair_name = "${var.project_name}-${var.environment}-deployer-key"

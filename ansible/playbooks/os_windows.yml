@@ -42,7 +42,7 @@
         # reboot: true
         # reboot_timeout: 600
       # register: win_updates_result
-# 
+#
     # - name: "Display Windows Update result"
       # ansible.builtin.debug:
         # var: win_updates_result
@@ -134,4 +134,4 @@
       register: iis_check
       when: "'web' in group_names or 'app' in group_names"
       failed_when: iis_check.status_code != 200
-      changed_when: false
+      changed_when: fals
