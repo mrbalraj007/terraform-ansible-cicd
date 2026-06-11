@@ -77,9 +77,52 @@ jobs:
       - name: Wait for EC2 instances to be ready
         run: |
           echo "Waiting for EC2 instances to fully initialize..."
-          echo "  Linux instances: ~60s for SSH"
-          echo "  Windows instances: ~120s for WinRM"
-          sleep 120
+          echo "  Linux instances: checking SSH (port 22)..."
+
+          # Wait for inventory to be generated from AWS
+          cd ansible
+          for i in $(seq 1 30); do
+            ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/dev/null
+            LINUX_IPS=$(python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+hosts = []
+for g in ['tag_OS_Type_amazon_linux', 'tag_OS_Type_ubuntu', 'tag_OS_Type_redhat']:
+    if g in data:
+        hosts.extend(data[g].get('hosts', []))
+print(' '.join(hosts))
+" < /tmp/ansible-inventory.json 2>/dev/null)
+            [ -n "$LINUX_IPS" ] && break
+            sleep 10
+          done
+
+          # Check SSH on Linux hosts
+          for ip in $LINUX_IPS; do
+            echo "  Checking SSH on $ip:22..."
+            for i in $(seq 1 12); do
+              nc -z -w5 "$ip" 22 2>/dev/null && { echo "    $ip:22 SSH ready ✓"; break; }
+              echo "    waiting... ($i/12)"
+              sleep 10
+            done
+          done
+
+          # Check WinRM on Windows hosts
+          WIN_IPS=$(python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+hosts = data.get('tag_OS_Type_windows', {}).get('hosts', [])
+print(' '.join(hosts))
+" < /tmp/ansible-inventory.json 2>/dev/null)
+          for ip in $WIN_IPS; do
+            echo "  Checking WinRM on $ip:5986..."
+            for i in $(seq 1 36); do
+              nc -z -w5 "$ip" 5986 2>/dev/null && { echo "    $ip:5986 WinRM ready ✓"; break; }
+              echo "    waiting... ($i/36)"
+              sleep 10
+            done
+          done
+
+          echo "EC2 readiness check complete."
 
       - name: Save inventory JSON (used by subsequent steps)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
