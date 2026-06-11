@@ -83,15 +83,14 @@ jobs:
           cd ansible
           for i in $(seq 1 30); do
             ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/dev/null
-            LINUX_IPS=$(python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-hosts = []
-for g in ['tag_OS_Type_amazon_linux', 'tag_OS_Type_ubuntu', 'tag_OS_Type_redhat']:
-    if g in data:
-        hosts.extend(data[g].get('hosts', []))
-print(' '.join(hosts))
-" < /tmp/ansible-inventory.json 2>/dev/null)
+            LINUX_IPS=$(python3 -c \"
+            import json, sys
+            data = json.load(sys.stdin)
+            hosts = []
+            for g in ['tag_OS_Type_amazon_linux', 'tag_OS_Type_ubuntu', 'tag_OS_Type_redhat']:
+                if g in data:
+                    hosts.extend(data[g].get('hosts', []))
+            print(' '.join(hosts))" < /tmp/ansible-inventory.json 2>/dev/null)
             [ -n "$LINUX_IPS" ] && break
             sleep 10
           done
@@ -107,12 +106,11 @@ print(' '.join(hosts))
           done
 
           # Check WinRM on Windows hosts
-          WIN_IPS=$(python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-hosts = data.get('tag_OS_Type_windows', {}).get('hosts', [])
-print(' '.join(hosts))
-" < /tmp/ansible-inventory.json 2>/dev/null)
+          WIN_IPS=$(python3 -c \"
+          import json, sys
+          data = json.load(sys.stdin)
+          hosts = data.get('tag_OS_Type_windows', {}).get('hosts', [])
+          print(' '.join(hosts))" < /tmp/ansible-inventory.json 2>/dev/null)
           for ip in $WIN_IPS; do
             echo "  Checking WinRM on $ip:5986..."
             for i in $(seq 1 36); do
