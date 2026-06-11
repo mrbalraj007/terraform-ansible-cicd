@@ -247,3 +247,5 @@ ansible-inventory -i aws_ec2.yml --list | python3 -m json.tool
 
   Push to main — Terraform provisions everything, Ansible auto-discovers OS types and runs the correct playbook for each.
 ```
+# GitHub MCP Server Setup Guide
+https://github.com/md-adnan70/MCP

@@ -79,16 +79,20 @@ jobs:
           echo "Private key ready at ~/.ssh/deployer_key"
 
       - name: Wait for EC2 instances to be ready
+        continue-on-error: true
         run: |
           echo "Waiting for EC2 instances to fully initialize..."
           echo "  Linux instances: checking SSH (port 22)..."
 
           # Wait for inventory to be generated from AWS
-          cd ansible
           for i in $(seq 1 30); do
-            ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/dev/null
+            ansible-inventory -i ansible/aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/dev/null || true
             LINUX_IPS=$(python3 scripts/get-inventory-ips.py tag_OS_Type_amazon_linux tag_OS_Type_ubuntu tag_OS_Type_redhat < /tmp/ansible-inventory.json 2>/dev/null)
-            [ -n "$LINUX_IPS" ] && break
+            if [ -n "$LINUX_IPS" ]; then
+              echo "  Found Linux hosts: $LINUX_IPS"
+              break
+            fi
+            echo "  No Linux hosts found yet (attempt $i/30)..."
             sleep 10
           done
 
@@ -104,6 +108,9 @@ jobs:
 
           # Check WinRM on Windows hosts
           WIN_IPS=$(python3 scripts/get-inventory-ips.py tag_OS_Type_windows < /tmp/ansible-inventory.json 2>/dev/null)
+          if [ -n "$WIN_IPS" ]; then
+            echo "  Found Windows hosts: $WIN_IPS"
+          fi
           for ip in $WIN_IPS; do
             echo "  Checking WinRM on $ip:5986..."
             for i in $(seq 1 36); do
@@ -178,6 +185,32 @@ jobs:
           else
             echo "No Windows hosts found - skipping WinRM password setup."
           fi
+
+      - name: Wait for WinRM to be ready on Windows hosts
+        if: always()
+        continue-on-error: true
+        run: |
+          if ! python3 scripts/check-inventory-group.py tag_OS_Type_windows < /tmp/ansible-inventory.json 2>/dev/null; then
+            echo "No Windows hosts found - skipping WinRM wait."
+            exit 0
+          fi
+          WIN_IPS=$(python3 scripts/get-inventory-ips.py tag_OS_Type_windows < /tmp/ansible-inventory.json)
+          for ip in $WIN_IPS; do
+            echo "Waiting for WinRM on $ip..."
+            for i in $(seq 1 30); do
+              # Try HTTPS (5986) first, then HTTP (5985)
+              if nc -z -w5 "$ip" 5986 2>/dev/null; then
+                echo "  $ip:5986 (HTTPS) ready ✓ (attempt $i)"
+                break
+              fi
+              if nc -z -w5 "$ip" 5985 2>/dev/null; then
+                echo "  $ip:5985 (HTTP) ready ✓ (attempt $i)"
+                break
+              fi
+              echo "  WinRM not ready yet... (attempt $i/30)"
+              sleep 10
+            done
+          done
 
       - name: Test WinRM connectivity (Windows hosts)
         if: always()
