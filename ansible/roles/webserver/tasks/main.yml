@@ -1,13 +1,22 @@
 ---
-- name: Install Nginx
+# Support both Debian/Ubuntu (apt) and RedHat/Amazon Linux (dnf)
+- name: Install Nginx (Debian/Ubuntu)
+  ansible.builtin.apt:
+    name: nginx
+    state: present
+    update_cache: true
+  when: ansible_os_family == "Debian"
+
+- name: Install Nginx (RedHat/Amazon Linux)
   ansible.builtin.dnf:
     name: nginx
     state: present
+  when: ansible_os_family == "RedHat"
 
 - name: Deploy index.html from template
   ansible.builtin.template:
     src: index.html.j2
-    dest: /usr/share/nginx/html/index.html
+    dest: "{{ web_server_root | default('/usr/share/nginx/html') }}/index.html"
     owner: root
     group: root
     mode: "0644"

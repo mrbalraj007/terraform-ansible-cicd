@@ -5,6 +5,10 @@ name: "2 - Ansible Configure Instances"
     secrets:
       AWS_IAM_ROLE_ARN:
         required: true
+      TF_VAR_TF_STATE_BUCKET:
+        required: true
+      TF_VAR_WINRM_PASSWORD:
+        required: false
 
   # Allow manual trigger (standalone)
   workflow_dispatch:
@@ -83,14 +87,7 @@ jobs:
           cd ansible
           for i in $(seq 1 30); do
             ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/dev/null
-            LINUX_IPS=$(python3 -c \"
-            import json, sys
-            data = json.load(sys.stdin)
-            hosts = []
-            for g in ['tag_OS_Type_amazon_linux', 'tag_OS_Type_ubuntu', 'tag_OS_Type_redhat']:
-                if g in data:
-                    hosts.extend(data[g].get('hosts', []))
-            print(' '.join(hosts))" < /tmp/ansible-inventory.json 2>/dev/null)
+            LINUX_IPS=$(python3 scripts/get-inventory-ips.py tag_OS_Type_amazon_linux tag_OS_Type_ubuntu tag_OS_Type_redhat < /tmp/ansible-inventory.json 2>/dev/null)
             [ -n "$LINUX_IPS" ] && break
             sleep 10
           done
@@ -106,11 +103,7 @@ jobs:
           done
 
           # Check WinRM on Windows hosts
-          WIN_IPS=$(python3 -c \"
-          import json, sys
-          data = json.load(sys.stdin)
-          hosts = data.get('tag_OS_Type_windows', {}).get('hosts', [])
-          print(' '.join(hosts))" < /tmp/ansible-inventory.json 2>/dev/null)
+          WIN_IPS=$(python3 scripts/get-inventory-ips.py tag_OS_Type_windows < /tmp/ansible-inventory.json 2>/dev/null)
           for ip in $WIN_IPS; do
             echo "  Checking WinRM on $ip:5986..."
             for i in $(seq 1 36); do
@@ -122,12 +115,22 @@ jobs:
 
           echo "EC2 readiness check complete."
 
-      - name: Save inventory JSON (used by subsequent steps)
+      - name: Save inventory JSON and generate host maps
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         run: |
           ansible-inventory -i aws_ec2.yml --list > /tmp/ansible-inventory.json 2>/tmp/ansible-warnings.txt
           echo "Inventory saved. Hosts discovered:"
           python3 ../scripts/inventory-host-details.py < /tmp/ansible-inventory.json
+
+      - name: Generate Ansible host map from Terraform outputs
+        working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
+        run: |
+          if [ -f "../terraform-outputs/terraform-outputs.json" ]; then
+            echo "Generating admin user map from Terraform outputs..."
+            python3 ../scripts/generate-ansible-host-map.py < ../terraform-outputs/terraform-outputs.json
+          else
+            echo "No Terraform outputs found - admin_user_map will use group_vars defaults."
+          fi
 
       - name: Test dynamic inventory — list all groups
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
@@ -155,16 +158,25 @@ jobs:
             fi
           done
 
-      - name: Retrieve Windows admin passwords from EC2
+      - name: Generate Windows host_vars with WinRM password
         if: always()
+        env:
+          WINRM_PW: ${{ secrets.TF_VAR_WINRM_PASSWORD }}
         run: |
-          if python3 scripts/check-inventory-group.py tag_OS_Type_windows < /tmp/ansible-inventory.json; then
-            echo "Retrieving Windows admin passwords from EC2..."
-            python3 scripts/get-windows-passwords.py \
-              --private-key ~/.ssh/deployer_key \
-              < /tmp/ansible-inventory.json
+          if python3 scripts/check-inventory-group.py tag_OS_Type_windows < /tmp/ansible-inventory.json 2>/dev/null; then
+            if [ -n "$WINRM_PW" ]; then
+              echo "Generating Windows host_vars from WinRM password secret..."
+              WIN_IPS=$(python3 scripts/get-inventory-ips.py tag_OS_Type_windows < /tmp/ansible-inventory.json)
+              for ip in $WIN_IPS; do
+                mkdir -p ansible/host_vars
+                printf "ansible_password: '%s'\n" "$WINRM_PW" > "ansible/host_vars/${ip}.yml"
+                echo "  Wrote ansible/host_vars/${ip}.yml"
+              done
+            else
+              echo "WARNING: TF_VAR_WINRM_PASSWORD not set - Windows hosts may be unreachable."
+            fi
           else
-            echo "No Windows hosts found (skipping password retrieval)"
+            echo "No Windows hosts found - skipping WinRM password setup."
           fi
 
       - name: Test WinRM connectivity (Windows hosts)

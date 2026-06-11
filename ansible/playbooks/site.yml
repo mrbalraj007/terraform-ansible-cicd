@@ -23,6 +23,7 @@
   gather_facts: true
   roles:
     - common
+    - webserver
   post_tasks:
     - name: "Notify — Amazon Linux configuration complete"
       ansible.builtin.debug:
@@ -35,6 +36,7 @@
   gather_facts: true
   roles:
     - common
+    - webserver
   post_tasks:
     - name: "Notify — Ubuntu configuration complete"
       ansible.builtin.debug:
@@ -47,6 +49,7 @@
   gather_facts: true
   roles:
     - common
+    - webserver
   post_tasks:
     - name: "Notify — RedHat configuration complete"
       ansible.builtin.debug:
