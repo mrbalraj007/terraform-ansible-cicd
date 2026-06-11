@@ -9,7 +9,6 @@ aws_region     = "us-east-1"
 project_name   = "tf-ansible-demo"
 environment    = "dev"
 spot_max_price = "0.016"
-winrm_username = "ansible_admin"
 
 # ──── Server Definitions ────────────────────────────────────────────────────
 # os_type options: amazon_linux, ubuntu, redhat, windows
