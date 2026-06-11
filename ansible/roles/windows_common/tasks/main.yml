@@ -21,8 +21,10 @@
 
 # ── PowerShell Execution Policy ─────────────────────────────────────────────
 - name: "Set PowerShell execution policy to RemoteSigned"
-  ansible.windows.win_shell: Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force
+  ansible.windows.win_shell: Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force -ErrorAction SilentlyContinue
   changed_when: false
+  failed_when: false
+  ignore_errors: true
 
 # ── Temporary Files Cleanup ─────────────────────────────────────────────────
 - name: "Clean up temporary files"
