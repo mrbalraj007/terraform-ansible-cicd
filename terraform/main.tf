@@ -208,10 +208,11 @@ locals {
   alarm_instances = var.create_cw_alarms ? flatten([
     for k, m in module.server_group : [
       for idx, id in m.instance_ids : {
-        key         = "${k}-${idx}"
-        group_name  = m.instance_group_name
-        instance_id = id
-        os_type     = m.os_type
+        key           = "${k}-${idx}"
+        group_name    = m.instance_group_name
+        instance_id   = id
+        os_type       = m.os_type
+        instance_name = "${m.instance_group_name}-${var.environment}-${idx + 1}"
       }
     ]
   ]) : []
@@ -219,8 +220,8 @@ locals {
 
 resource "aws_cloudwatch_metric_alarm" "cpu" {
   count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
-  alarm_name          = "EC2 ${local.alarm_instances[count.index].group_name}-CPU-Alerts"
-  alarm_description   = "CPU utilization > 80% for ${local.alarm_instances[count.index].group_name} (${local.alarm_instances[count.index].instance_id})"
+  alarm_name          = "EC2 ${local.alarm_instances[count.index].instance_name}-CPU-Alerts"
+  alarm_description   = "CPU utilization > 80% for ${local.alarm_instances[count.index].instance_name} (${local.alarm_instances[count.index].instance_id})"
   namespace           = "AWS/EC2"
   metric_name         = "CPUUtilization"
   statistic           = "Average"
@@ -239,15 +240,15 @@ resource "aws_cloudwatch_metric_alarm" "cpu" {
   ok_actions                = [aws_sns_topic.alarms[0].arn]
 
   tags = merge(local.common_tags, {
-    Name        = "EC2 ${local.alarm_instances[count.index].group_name}-CPU-Alerts"
+    Name        = "EC2 ${local.alarm_instances[count.index].instance_name}-CPU-Alerts"
     Environment = var.environment
   })
 }
 
 resource "aws_cloudwatch_metric_alarm" "memory" {
   count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
-  alarm_name          = "EC2 ${local.alarm_instances[count.index].group_name}-Memory-Alerts"
-  alarm_description   = "Memory utilization > 80% for ${local.alarm_instances[count.index].group_name} (${local.alarm_instances[count.index].instance_id})"
+  alarm_name          = "EC2 ${local.alarm_instances[count.index].instance_name}-Memory-Alerts"
+  alarm_description   = "Memory utilization > 80% for ${local.alarm_instances[count.index].instance_name} (${local.alarm_instances[count.index].instance_id})"
   namespace           = "CWAgent"
   metric_name         = "mem_used_percent"
   statistic           = "Average"
@@ -266,15 +267,15 @@ resource "aws_cloudwatch_metric_alarm" "memory" {
   ok_actions                = [aws_sns_topic.alarms[0].arn]
 
   tags = merge(local.common_tags, {
-    Name        = "EC2 ${local.alarm_instances[count.index].group_name}-Memory-Alerts"
+    Name        = "EC2 ${local.alarm_instances[count.index].instance_name}-Memory-Alerts"
     Environment = var.environment
   })
 }
 
 resource "aws_cloudwatch_metric_alarm" "disk" {
   count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
-  alarm_name          = "EC2 ${local.alarm_instances[count.index].group_name}-Disk-Alerts"
-  alarm_description   = "Root disk utilization > 80% for ${local.alarm_instances[count.index].group_name} (${local.alarm_instances[count.index].instance_id})"
+  alarm_name          = "EC2 ${local.alarm_instances[count.index].instance_name}-Disk-Alerts"
+  alarm_description   = "Root disk utilization > 80% for ${local.alarm_instances[count.index].instance_name} (${local.alarm_instances[count.index].instance_id})"
   namespace           = "CWAgent"
   metric_name         = "disk_used_percent"
   statistic           = "Average"
@@ -295,7 +296,7 @@ resource "aws_cloudwatch_metric_alarm" "disk" {
   ok_actions                = [aws_sns_topic.alarms[0].arn]
 
   tags = merge(local.common_tags, {
-    Name        = "EC2 ${local.alarm_instances[count.index].group_name}-Disk-Alerts"
+    Name        = "EC2 ${local.alarm_instances[count.index].instance_name}-Disk-Alerts"
     Environment = var.environment
   })
 }
