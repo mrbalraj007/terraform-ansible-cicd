@@ -50,8 +50,8 @@ $configJson = @'
             }
         },
         "append_dimensions": {
-            "InstanceId": "${aws:InstanceId}",
-            "InstanceType": "${aws:InstanceType}"
+            "InstanceId": "$${aws:InstanceId}",
+            "InstanceType": "$${aws:InstanceType}"
         }
     }
 }
