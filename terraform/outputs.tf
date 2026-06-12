@@ -91,7 +91,7 @@ output "cw_iam_role_name" {
 
 output "cw_alarm_count" {
   description = "Number of CloudWatch alarms created (3 per instance: CPU, Memory, Disk)"
-  value       = var.create_cw_alarms ? length(aws_cloudwatch_metric_alarm.cpu) : 0
+  value       = var.create_cw_alarms ? length(aws_cloudwatch_metric_alarm.cpu) + length(aws_cloudwatch_metric_alarm.memory) + length(aws_cloudwatch_metric_alarm.disk) : 0
 }
 
 # ──── Summary ───────────────────────────────────────────────────────────────
@@ -118,7 +118,7 @@ output "deployment_summary" {
     var.create_cw_alarms ? [
       "── CloudWatch Monitoring ─────────────────────────────",
       "  Status:     ENABLED",
-      "  Alarms:     ${length(aws_cloudwatch_metric_alarm.cpu)} per instance (CPU, Memory, Disk)",
+      "  Alarms:     ${length(aws_cloudwatch_metric_alarm.cpu)} × CPU + ${length(aws_cloudwatch_metric_alarm.memory)} × Memory + ${length(aws_cloudwatch_metric_alarm.disk)} × Disk = ${length(aws_cloudwatch_metric_alarm.cpu) + length(aws_cloudwatch_metric_alarm.memory) + length(aws_cloudwatch_metric_alarm.disk)} total",
       "  SNS Topic:  ${try(aws_sns_topic.alarms[0].arn, "N/A")}",
       "  IAM Role:   ${try(aws_iam_role.cloudwatch_agent[0].name, "N/A")}",
       "  Notify:     ${var.alarm_email != "" ? var.alarm_email : "No email configured"}",
