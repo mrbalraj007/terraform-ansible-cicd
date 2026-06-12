@@ -62,6 +62,18 @@ variable "winrm_password" {
   default     = ""
 }
 
+variable "create_cw_alarms" {
+  description = "Enable CloudWatch alarms and metrics for EC2 instances"
+  type        = bool
+  default     = true
+}
+
+variable "alarm_email" {
+  description = "Email address for CloudWatch alarm SNS notifications. Set to empty string to skip email subscription."
+  type        = string
+  default     = ""
+}
+
 variable "tf_state_bucket" {
   description = "S3 bucket name for Terraform state (used as shared store for the deployer private key). Injected via TF_VAR_tf_state_bucket from GitHub Actions secrets."
   type        = string

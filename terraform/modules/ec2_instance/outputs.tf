@@ -47,6 +47,11 @@ output "instance_role" {
   value       = var.role
 }
 
+output "instance_group_name" {
+  description = "Base group name for these instances (from var.instance_name)"
+  value       = var.instance_name
+}
+
 # output "eip_addresses" {
 #   description = "Elastic IP addresses (Windows instances only)"
 #   value       = try(aws_eip.this[*].public_ip, [])

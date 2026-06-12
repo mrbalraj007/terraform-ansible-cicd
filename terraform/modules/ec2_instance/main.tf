@@ -40,6 +40,13 @@ locals {
 
   # ── Security group name ──────────────────────────────────────────────────
   sg_name = "${var.project_name}-${var.environment}-${var.role}-${var.os_type}-sg"
+
+  # ── CloudWatch Agent user_data (Linux) ────────────────────────────────────
+  # Installs and starts the unified CloudWatch agent with basic config.
+  cw_agent_userdata = var.os_type != "windows" && var.iam_instance_profile != "" ? templatefile("${path.module}/templates/cw-agent-setup.sh", {}) : ""
+
+  # ── CloudWatch Agent user_data (Windows — appended to WinRM bootstrap) ────
+  cw_agent_userdata_windows = var.os_type == "windows" && var.iam_instance_profile != "" ? templatefile("${path.module}/templates/cw-agent-setup.ps1", {}) : ""
 }
 
 # ──── Security Group ───────────────────────────────────────────────────────
@@ -87,7 +94,12 @@ resource "aws_instance" "this" {
   subnet_id                   = var.subnet_ids[count.index % length(var.subnet_ids)]
   vpc_security_group_ids      = concat([aws_security_group.this.id], var.additional_sg_ids)
   associate_public_ip_address = var.assign_public_ip
-  # Inject winrm_password into user_data if present (Windows only)
+  iam_instance_profile        = var.iam_instance_profile != "" ? var.iam_instance_profile : null
+  # ── user_data logic ────────────────────────────────────────────────────
+  # Priority:
+  #   1. Windows (var.user_data_script set) → append CW agent if IAM profile exists
+  #   2. Linux with IAM profile → CW agent setup only
+  #   3. No monitoring → null
   user_data_base64 = var.user_data_script != "" ? (
     var.winrm_password != "" ? base64encode(
       replace(
@@ -95,8 +107,12 @@ resource "aws_instance" "this" {
         "$${WINRM_PASSWORD}",
         var.winrm_password
       )
-    ) : var.user_data_script
-  ) : null
+      ) : (
+      var.iam_instance_profile != "" ? base64encode(
+        format("%s\n\n%s", base64decode(var.user_data_script), local.cw_agent_userdata_windows)
+      ) : var.user_data_script
+    )
+  ) : (var.iam_instance_profile != "" ? base64encode(local.cw_agent_userdata) : null)
 
   # ── Spot instance (optional) ─────────────────────────────────────────────
   dynamic "instance_market_options" {

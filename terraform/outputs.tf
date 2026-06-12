@@ -77,6 +77,23 @@ output "private_key_s3_uri" {
   value       = "s3://${var.tf_state_bucket}/keys/${local.key_pair_name}.pem"
 }
 
+# ──── CloudWatch Monitoring Outputs ──────────────────────────────────────────
+
+output "sns_topic_arn" {
+  description = "ARN of the SNS topic for CloudWatch alarm notifications"
+  value       = var.create_cw_alarms ? try(aws_sns_topic.alarms[0].arn, "") : ""
+}
+
+output "cw_iam_role_name" {
+  description = "Name of the IAM role for CloudWatch Agent"
+  value       = var.create_cw_alarms ? try(aws_iam_role.cloudwatch_agent[0].name, "") : ""
+}
+
+output "cw_alarm_count" {
+  description = "Number of CloudWatch alarms created (3 per instance: CPU, Memory, Disk)"
+  value       = var.create_cw_alarms ? length(aws_cloudwatch_metric_alarm.cpu) : 0
+}
+
 # ──── Summary ───────────────────────────────────────────────────────────────
 
 output "deployment_summary" {
@@ -97,5 +114,19 @@ output "deployment_summary" {
         "    SGRP:      ${m.security_group_id}",
         "",
       ]
-  ])))
+    ]),
+    var.create_cw_alarms ? [
+      "── CloudWatch Monitoring ─────────────────────────────",
+      "  Status:     ENABLED",
+      "  Alarms:     ${length(aws_cloudwatch_metric_alarm.cpu)} per instance (CPU, Memory, Disk)",
+      "  SNS Topic:  ${try(aws_sns_topic.alarms[0].arn, "N/A")}",
+      "  IAM Role:   ${try(aws_iam_role.cloudwatch_agent[0].name, "N/A")}",
+      "  Notify:     ${var.alarm_email != "" ? var.alarm_email : "No email configured"}",
+      "",
+      ] : [
+      "── CloudWatch Monitoring ─────────────────────────────",
+      "  Status:     DISABLED",
+      "",
+    ]
+  ))
 }
