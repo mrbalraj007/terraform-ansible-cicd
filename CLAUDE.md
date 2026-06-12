@@ -115,13 +115,13 @@ gh workflow run "1 - Terraform Provision Infrastructure" --ref main -f action=de
 - **site.yml**: Routes to OS-specific plays by `tag_OS_Type_*`. Linux plays run `common` + `webserver` roles; Windows runs `windows_common` role.
 - **Roles**: `common` (packages, timezone, MOTD — handles AL2023 curl-minimal conflict), `webserver` (nginx install/config/template for Linux), `windows_common` (Windows updates, timezone, execution policy, RDP, temp cleanup, IE ESC disable).
 - **WinRM**: Windows uses self-signed cert + HTTPS (port 5986) with basic auth. `scripts/configure-winrm.ps1` runs at boot via user_data. Pipeline polls for WinRM readiness and retrieves admin passwords from EC2.
-- **WinRM HTTP verification in CI**: Post-playbook web checks use `--limit` to skip Windows hosts (the `uri` module requires Python on the target).
+- **HTTP verification in CI**: Linux web servers verified via `ansible -m uri` (SSH into host). Windows IIS verified via `curl` from the runner against the public IP on port 80. Both steps use `continue-on-error` and do not fail the pipeline.
 
 ### CI/CD Pipeline
 
 - **00-terraform-plan.yml**: Plan-only workflow (fmt check + validate + `terraform plan`). Good for review before apply.
 - **01-terraform-provision.yml**: Plan + Apply (with host map generation), or Destroy (with state cleanup). Manual `action` input: `plan`, `apply`, `destroy`.
-- **02-ansible-configure.yml**: Polls SSH/WinRM connectivity, runs `site.yml`, verifies web servers (Linux only), generates summary. Triggered by `workflow_run` on Terraform completion or manually.
+- **02-ansible-configure.yml**: Polls SSH/WinRM connectivity, runs `site.yml`, verifies web servers (Linux via `ansible -m uri`, Windows IIS via `curl` against public IP), generates summary. Triggered by `workflow_run` on Terraform completion or manually.
 - **03-full-cicd.yml**: Chains Terraform → Ansible as reusable workflows with `secrets: inherit`.
 - **Secrets required**: `AWS_IAM_ROLE_ARN`, `SSH_PUBLIC_KEY`, `SSH_PRIVATE_KEY`.
 
