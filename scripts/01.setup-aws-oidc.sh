@@ -83,6 +83,8 @@ aws iam attach-role-policy --role-name "$ROLE_NAME" \
   --policy-arn "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess"
 aws iam attach-role-policy --role-name "$ROLE_NAME" \
   --policy-arn "arn:aws:iam::aws:policy/IAMFullAccess"
+aws iam attach-role-policy --role-name "$ROLE_NAME" \
+  --policy-arn "arn:aws:iam::aws:policy/AmazonSNSFullAccess"
 
 ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
 
