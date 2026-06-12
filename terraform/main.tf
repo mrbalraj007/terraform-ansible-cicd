@@ -137,4 +137,165 @@ module "server_group" {
   # Pass the WinRM bootstrap script only to Windows instances
   user_data_script = each.value.os_type == "windows" ? local.windows_userdata_b64 : ""
   winrm_password   = var.winrm_password
+
+  # CloudWatch Agent IAM instance profile
+  iam_instance_profile = var.create_cw_alarms ? aws_iam_instance_profile.cloudwatch_agent[0].name : ""
+}
+
+# ──── CloudWatch Monitoring Resources ──────────────────────────────────────────
+# These resources are created only when create_cw_alarms is true.
+
+# ── IAM Role for CloudWatch Agent ──────────────────────────────────────────────
+resource "aws_iam_role" "cloudwatch_agent" {
+  count = var.create_cw_alarms ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-cloudwatch-agent"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-${var.environment}-cloudwatch-agent"
+    Environment = var.environment
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "cloudwatch_agent" {
+  count      = var.create_cw_alarms ? 1 : 0
+  role       = aws_iam_role.cloudwatch_agent[0].name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+}
+
+resource "aws_iam_instance_profile" "cloudwatch_agent" {
+  count = var.create_cw_alarms ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-cloudwatch-agent"
+  role  = aws_iam_role.cloudwatch_agent[0].name
+}
+
+# ── SNS Topic for Alarm Notifications ──────────────────────────────────────────
+resource "aws_sns_topic" "alarms" {
+  count = var.create_cw_alarms ? 1 : 0
+  name  = "${var.project_name}-${var.environment}-ec2-alarms"
+
+  tags = merge(local.common_tags, {
+    Name        = "${var.project_name}-${var.environment}-ec2-alarms"
+    Environment = var.environment
+  })
+}
+
+resource "aws_sns_topic_subscription" "alarm_email" {
+  count     = var.create_cw_alarms && var.alarm_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.alarms[0].arn
+  protocol  = "email"
+  endpoint  = var.alarm_email
+}
+
+# ── CloudWatch Metric Alarms ───────────────────────────────────────────────────
+# Creates CPU, Memory, and Disk alarms for each server group.
+# Alarms are named: EC2<Name>-CPU-Alerts, EC2<Name>-Memory-Alerts, EC2<Name>-Disk-Alerts
+
+locals {
+  # Flatten the server groups into a list of instance details for alarm creation
+  alarm_instances = var.create_cw_alarms ? flatten([
+    for k, m in module.server_group : [
+      for idx, id in m.instance_ids : {
+        key         = "${k}-${idx}"
+        group_name  = m.instance_group_name
+        instance_id = id
+        os_type     = m.os_type
+      }
+    ]
+  ]) : []
+}
+
+resource "aws_cloudwatch_metric_alarm" "cpu" {
+  count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
+  alarm_name          = "EC2 ${local.alarm_instances[count.index].group_name}-CPU-Alerts"
+  alarm_description   = "CPU utilization > 80% for ${local.alarm_instances[count.index].group_name} (${local.alarm_instances[count.index].instance_id})"
+  namespace           = "AWS/EC2"
+  metric_name         = "CPUUtilization"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    InstanceId = local.alarm_instances[count.index].instance_id
+  }
+
+  alarm_actions             = [aws_sns_topic.alarms[0].arn]
+  insufficient_data_actions = [aws_sns_topic.alarms[0].arn]
+  ok_actions                = [aws_sns_topic.alarms[0].arn]
+
+  tags = merge(local.common_tags, {
+    Name        = "EC2 ${local.alarm_instances[count.index].group_name}-CPU-Alerts"
+    Environment = var.environment
+  })
+}
+
+resource "aws_cloudwatch_metric_alarm" "memory" {
+  count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
+  alarm_name          = "EC2 ${local.alarm_instances[count.index].group_name}-Memory-Alerts"
+  alarm_description   = "Memory utilization > 80% for ${local.alarm_instances[count.index].group_name} (${local.alarm_instances[count.index].instance_id})"
+  namespace           = "CWAgent"
+  metric_name         = "mem_used_percent"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    InstanceId = local.alarm_instances[count.index].instance_id
+  }
+
+  alarm_actions             = [aws_sns_topic.alarms[0].arn]
+  insufficient_data_actions = [aws_sns_topic.alarms[0].arn]
+  ok_actions                = [aws_sns_topic.alarms[0].arn]
+
+  tags = merge(local.common_tags, {
+    Name        = "EC2 ${local.alarm_instances[count.index].group_name}-Memory-Alerts"
+    Environment = var.environment
+  })
+}
+
+resource "aws_cloudwatch_metric_alarm" "disk" {
+  count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
+  alarm_name          = "EC2 ${local.alarm_instances[count.index].group_name}-Disk-Alerts"
+  alarm_description   = "Root disk utilization > 80% for ${local.alarm_instances[count.index].group_name} (${local.alarm_instances[count.index].instance_id})"
+  namespace           = "CWAgent"
+  metric_name         = "disk_used_percent"
+  statistic           = "Average"
+  period              = 300
+  evaluation_periods  = 2
+  threshold           = 80
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching"
+
+  dimensions = {
+    InstanceId = local.alarm_instances[count.index].instance_id
+    mount_path = "/"
+    filesystem = "*"
+  }
+
+  alarm_actions             = [aws_sns_topic.alarms[0].arn]
+  insufficient_data_actions = [aws_sns_topic.alarms[0].arn]
+  ok_actions                = [aws_sns_topic.alarms[0].arn]
+
+  tags = merge(local.common_tags, {
+    Name        = "EC2 ${local.alarm_instances[count.index].group_name}-Disk-Alerts"
+    Environment = var.environment
+  })
 }

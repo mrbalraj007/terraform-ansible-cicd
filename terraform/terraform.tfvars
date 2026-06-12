@@ -10,6 +10,12 @@ project_name   = "tf-ansible-demo"
 environment    = "dev"
 spot_max_price = "0.0233"
 
+# ──── CloudWatch Monitoring ───────────────────────────────────────────────────
+# Set create_cw_alarms to false to skip CloudWatch alarms and agent installation.
+# alarm_email receives SNS notifications when alarms trigger.
+create_cw_alarms = true
+alarm_email      = "akwonderworld@gmail.com"
+
 # ──── Server Definitions ────────────────────────────────────────────────────
 # os_type options: amazon_linux, ubuntu, redhat, windows
 # role options:    web, app, db, bastion, monitoring, etc.

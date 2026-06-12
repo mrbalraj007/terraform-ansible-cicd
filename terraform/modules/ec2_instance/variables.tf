@@ -149,3 +149,9 @@ variable "winrm_password" {
   sensitive   = true
   default     = ""
 }
+
+variable "iam_instance_profile" {
+  description = "IAM instance profile name to attach to EC2 instances (for CloudWatch Agent, etc.)"
+  type        = string
+  default     = ""
+}
