@@ -200,30 +200,84 @@ resource "aws_sns_topic_subscription" "alarm_email" {
 }
 
 # ── CloudWatch Metric Alarms ───────────────────────────────────────────────────
-# Creates CPU, Memory, and Disk alarms for each server group.
-# Alarms are named: EC2<Name>-CPU-Alerts, EC2<Name>-Memory-Alerts, EC2<Name>-Disk-Alerts
+# Creates CPU, Memory, and Disk alarms as a map keyed by instance ID + metric type.
+# Each server gets its own independent alarm — not grouped. Adding a new server
+# to terraform.tfvars automatically generates 3 new alarms (CPU, Memory, Disk).
+#
+# Alarm names: EC2 <instance_name>-{CPU,Memory,Disk}-Alerts
+#   e.g. EC2 web-server-dev-1-CPU-Alerts
+#        EC2 app-server-dev-1-Memory-Alerts
+#        EC2 win-server-dev-1-Disk-Alerts
 
 locals {
-  # Flatten the server groups into a list of instance details for alarm creation
-  alarm_instances = var.create_cw_alarms ? flatten([
-    for k, m in module.server_group : [
-      for idx, id in m.instance_ids : {
-        key           = "${k}-${idx}"
-        group_name    = m.instance_group_name
-        instance_id   = id
-        os_type       = m.os_type
-        instance_name = "${m.instance_group_name}-${var.environment}-${idx + 1}"
+  # Build a map of instance details keyed by a unique compound key
+  # e.g. "web-amazon_linux-0-0" → { instance_id, instance_name, os_type }
+  alarm_instance_map = var.create_cw_alarms ? {
+    for k, m in module.server_group : k => {
+      group_name = m.instance_group_name
+      os_type    = m.os_type
+      instances = {
+        for idx, id in m.instance_ids :
+        "${m.instance_group_name}-${var.environment}-${idx + 1}" => {
+          instance_id   = id
+          instance_name = "${m.instance_group_name}-${var.environment}-${idx + 1}"
+          os_type       = m.os_type
+        }
       }
-    ]
-  ]) : []
+    }
+  } : {}
+}
+
+locals {
+  # Flatten into a single map of all instances across all groups
+  # key = instance name (unique per environment), value = instance details
+  all_instances = var.create_cw_alarms ? merge(values(local.alarm_instance_map)[*].instances...) : {}
+
+  # Create per-instance alarm config maps for for_each
+  alarm_cpu_configs = var.create_cw_alarms ? {
+    for name, inst in local.all_instances :
+    "cpu-${name}" => {
+      alarm_name    = "EC2 ${name}-CPU-Alerts"
+      description   = "CPU utilization > 80% for ${name} (${inst.instance_id})"
+      namespace     = "AWS/EC2"
+      metric_name   = "CPUUtilization"
+      instance_id   = inst.instance_id
+      instance_name = name
+    }
+  } : {}
+
+  alarm_memory_configs = var.create_cw_alarms ? {
+    for name, inst in local.all_instances :
+    "memory-${name}" => {
+      alarm_name    = "EC2 ${name}-Memory-Alerts"
+      description   = "Memory utilization > 80% for ${name} (${inst.instance_id})"
+      namespace     = "CWAgent"
+      metric_name   = "mem_used_percent"
+      instance_id   = inst.instance_id
+      instance_name = name
+    }
+  } : {}
+
+  alarm_disk_configs = var.create_cw_alarms ? {
+    for name, inst in local.all_instances :
+    "disk-${name}" => {
+      alarm_name    = "EC2 ${name}-Disk-Alerts"
+      description   = "Root disk utilization > 80% for ${name} (${inst.instance_id})"
+      namespace     = "CWAgent"
+      metric_name   = "disk_used_percent"
+      instance_id   = inst.instance_id
+      instance_name = name
+    }
+  } : {}
 }
 
 resource "aws_cloudwatch_metric_alarm" "cpu" {
-  count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
-  alarm_name          = "EC2 ${local.alarm_instances[count.index].instance_name}-CPU-Alerts"
-  alarm_description   = "CPU utilization > 80% for ${local.alarm_instances[count.index].instance_name} (${local.alarm_instances[count.index].instance_id})"
-  namespace           = "AWS/EC2"
-  metric_name         = "CPUUtilization"
+  for_each = var.create_cw_alarms ? local.alarm_cpu_configs : {}
+
+  alarm_name          = each.value.alarm_name
+  alarm_description   = each.value.description
+  namespace           = each.value.namespace
+  metric_name         = each.value.metric_name
   statistic           = "Average"
   period              = 300
   evaluation_periods  = 2
@@ -232,7 +286,7 @@ resource "aws_cloudwatch_metric_alarm" "cpu" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    InstanceId = local.alarm_instances[count.index].instance_id
+    InstanceId = each.value.instance_id
   }
 
   alarm_actions             = [aws_sns_topic.alarms[0].arn]
@@ -240,17 +294,18 @@ resource "aws_cloudwatch_metric_alarm" "cpu" {
   ok_actions                = [aws_sns_topic.alarms[0].arn]
 
   tags = merge(local.common_tags, {
-    Name        = "EC2 ${local.alarm_instances[count.index].instance_name}-CPU-Alerts"
+    Name        = each.value.alarm_name
     Environment = var.environment
   })
 }
 
 resource "aws_cloudwatch_metric_alarm" "memory" {
-  count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
-  alarm_name          = "EC2 ${local.alarm_instances[count.index].instance_name}-Memory-Alerts"
-  alarm_description   = "Memory utilization > 80% for ${local.alarm_instances[count.index].instance_name} (${local.alarm_instances[count.index].instance_id})"
-  namespace           = "CWAgent"
-  metric_name         = "mem_used_percent"
+  for_each = var.create_cw_alarms ? local.alarm_memory_configs : {}
+
+  alarm_name          = each.value.alarm_name
+  alarm_description   = each.value.description
+  namespace           = each.value.namespace
+  metric_name         = each.value.metric_name
   statistic           = "Average"
   period              = 300
   evaluation_periods  = 2
@@ -259,7 +314,7 @@ resource "aws_cloudwatch_metric_alarm" "memory" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    InstanceId = local.alarm_instances[count.index].instance_id
+    InstanceId = each.value.instance_id
   }
 
   alarm_actions             = [aws_sns_topic.alarms[0].arn]
@@ -267,17 +322,18 @@ resource "aws_cloudwatch_metric_alarm" "memory" {
   ok_actions                = [aws_sns_topic.alarms[0].arn]
 
   tags = merge(local.common_tags, {
-    Name        = "EC2 ${local.alarm_instances[count.index].instance_name}-Memory-Alerts"
+    Name        = each.value.alarm_name
     Environment = var.environment
   })
 }
 
 resource "aws_cloudwatch_metric_alarm" "disk" {
-  count               = var.create_cw_alarms ? length(local.alarm_instances) : 0
-  alarm_name          = "EC2 ${local.alarm_instances[count.index].instance_name}-Disk-Alerts"
-  alarm_description   = "Root disk utilization > 80% for ${local.alarm_instances[count.index].instance_name} (${local.alarm_instances[count.index].instance_id})"
-  namespace           = "CWAgent"
-  metric_name         = "disk_used_percent"
+  for_each = var.create_cw_alarms ? local.alarm_disk_configs : {}
+
+  alarm_name          = each.value.alarm_name
+  alarm_description   = each.value.description
+  namespace           = each.value.namespace
+  metric_name         = each.value.metric_name
   statistic           = "Average"
   period              = 300
   evaluation_periods  = 2
@@ -286,7 +342,7 @@ resource "aws_cloudwatch_metric_alarm" "disk" {
   treat_missing_data  = "notBreaching"
 
   dimensions = {
-    InstanceId = local.alarm_instances[count.index].instance_id
+    InstanceId = each.value.instance_id
     mount_path = "/"
     filesystem = "*"
   }
@@ -296,7 +352,7 @@ resource "aws_cloudwatch_metric_alarm" "disk" {
   ok_actions                = [aws_sns_topic.alarms[0].arn]
 
   tags = merge(local.common_tags, {
-    Name        = "EC2 ${local.alarm_instances[count.index].instance_name}-Disk-Alerts"
+    Name        = each.value.alarm_name
     Environment = var.environment
   })
 }
