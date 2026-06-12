@@ -243,7 +243,7 @@ jobs:
           echo "Running: $CMD"
           eval $CMD
 
-      - name: Verify web servers are responding
+      - name: Verify web servers are responding (Linux hosts)
         working-directory: ${{ env.ANSIBLE_WORKING_DIR }}
         if: always()
         run: |
@@ -253,7 +253,8 @@ jobs:
               ansible "$group" -i aws_ec2.yml \
                 --private-key ~/.ssh/deployer_key \
                 -m uri -a "url=http://{{ ansible_host }} return_content=yes" \
-                2>&1 || echo "Note: some hosts may not be web servers"
+                --limit 'tag_OS_Type_amazon_linux:tag_OS_Type_ubuntu:tag_OS_Type_redhat' \
+                2>&1 || echo "Note: some hosts may not be web servers (or are Windows hosts)"
             fi
           done
 
